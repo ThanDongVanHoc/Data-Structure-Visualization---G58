@@ -591,10 +591,7 @@ void Renderer::RenderTrie()
             std::string searchString(searchBuffer);
             if (is_valid_input(searchString))
             {
-                if (trie.find_string(searchString))
-                {
-                    // Highlight the found string
-                }
+                trie.find_string(searchString);
                 searchIndex = 0;
                 searchBuffer[0] = '\0';
             }

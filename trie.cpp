@@ -74,11 +74,6 @@ void Trie::add_string(std::string s)
             p->cnt++;
         }
     }
-    p->exist++;
-}
-
-bool Trie::delete_string_recursive(Node *&p, std::string &s, int i)
-{
     p->color = YELLOW;
     DrawTrie(root, GetScreenWidth(), GetScreenHeight());
     EndDrawing();
@@ -86,6 +81,12 @@ bool Trie::delete_string_recursive(Node *&p, std::string &s, int i)
     BeginDrawing();
     ClearBackground(RAYWHITE);
     p->color = BLACK;
+    p->exist++;
+}
+
+bool Trie::delete_string_recursive(Node *&p, std::string &s, int i)
+{
+
     if (i != (int)s.size())
     {
         int c;
@@ -154,6 +155,13 @@ bool Trie::find_string(std::string s)
     Node *p = root;
     for (auto f : s)
     {
+        p->color = YELLOW;
+        DrawTrie(root, GetScreenWidth(), GetScreenHeight());
+        EndDrawing();
+        std::this_thread::sleep_for(std::chrono::milliseconds(300)); // Delay for animation
+        BeginDrawing();
+        ClearBackground(RAYWHITE);
+        p->color = BLACK;
         int c;
         if (f >= 'a' && f <= 'z')
             c = f - 'a';
@@ -164,6 +172,13 @@ bool Trie::find_string(std::string s)
             return false;
         p = p->child[c];
     }
+    p->color = YELLOW;
+    DrawTrie(root, GetScreenWidth(), GetScreenHeight());
+    EndDrawing();
+    std::this_thread::sleep_for(std::chrono::milliseconds(300)); // Delay for animation
+    BeginDrawing();
+    ClearBackground(RAYWHITE);
+    p->color = BLACK;
     return (p->exist != 0);
 }
 void Trie::updateSpringAnimation(Node *node, float stiffness, float damping, float dt, float speedMultiplier)
