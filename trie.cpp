@@ -26,6 +26,7 @@ bool Trie::check(Node *node)
 void Trie::add_string(std::string s)
 {
     Node *p = root;
+    p->cnt++;
     for (auto f : s)
     {
         p->color = YELLOW;
@@ -54,7 +55,6 @@ void Trie::add_string(std::string s)
             compute_positions(root, 1, currentX, horizontalSpacing, verticalSpacing);
             float stiffness = 3.5f; // Tăng độ cứng: chuyển từ 0.2f sang 1.0f để animation nhanh hơn
             float damping = 0.75f;  // Điều chỉnh damping: có thể thử với 0.9f để ổn định chuyển động
-            double previousTime = GetTime();
             int step = 0;
             while (!check(root) && step <= 50)
             {
@@ -77,8 +77,15 @@ void Trie::add_string(std::string s)
     p->exist++;
 }
 
-bool Trie::delete_string_recursive(Node *p, std::string &s, int i)
+bool Trie::delete_string_recursive(Node *&p, std::string &s, int i)
 {
+    p->color = YELLOW;
+    DrawTrie(root, GetScreenWidth(), GetScreenHeight());
+    EndDrawing();
+    std::this_thread::sleep_for(std::chrono::milliseconds(300)); // Delay for animation
+    BeginDrawing();
+    ClearBackground(RAYWHITE);
+    p->color = BLACK;
     if (i != (int)s.size())
     {
         int c;
@@ -95,16 +102,42 @@ bool Trie::delete_string_recursive(Node *p, std::string &s, int i)
     {
         p->exist--;
     }
-
+    p->color = YELLOW;
+    DrawTrie(root, GetScreenWidth(), GetScreenHeight());
+    EndDrawing();
+    std::this_thread::sleep_for(std::chrono::milliseconds(300)); // Delay for animation
+    BeginDrawing();
+    ClearBackground(RAYWHITE);
     if (p != root)
     {
         p->cnt--;
         if (p->cnt == 0)
         {
-            delete (p);
+            delete p;
+            p = nullptr;
+            float currentX = 40;
+            float horizontalSpacing = 80;
+            float verticalSpacing = 80;
+            compute_positions(root, 1, currentX, horizontalSpacing, verticalSpacing);
+            float stiffness = 3.5f; // Tăng độ cứng: chuyển từ 0.2f sang 1.0f để animation nhanh hơn
+            float damping = 0.75f;  // Điều chỉnh damping: có thể thử với 0.9f để ổn định chuyển động
+            int step = 0;
+            while (!check(root) && step <= 50)
+            {
+                double dt = 0.1;
+                updateSpringAnimation(root, stiffness, damping, dt, 1.0f);
+                DrawTrie(root, GetScreenWidth(), GetScreenHeight());
+                EndDrawing();
+                BeginDrawing();
+                ClearBackground(RAYWHITE);
+                step++;
+            }
             return true;
         }
     }
+    else
+        p->cnt--;
+    p->color = BLACK;
     return false;
 }
 
@@ -113,6 +146,7 @@ void Trie::delete_string(std::string s)
     if (!find_string(s))
         return;
     delete_string_recursive(root, s, 0);
+    return;
 }
 
 bool Trie::find_string(std::string s)
@@ -157,6 +191,8 @@ void Trie::updateSpringAnimation(Node *node, float stiffness, float damping, flo
 }
 void Trie::compute_positions(Node *node, int depth, float &currentX, float horizontalSpacing, float verticalSpacing)
 {
+    if (!node)
+        return;
     node->targetY = depth * verticalSpacing;
 
     int numChildren = 0;

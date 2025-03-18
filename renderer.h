@@ -12,8 +12,7 @@ public:
     void renderLinkedList(LinkedList *list);
     void renderAVL();
     void RenderHashTable();
-    void Render();
-    void RenderTrie(Trie &trie);
+    void RenderTrie();
     // void DrawTrie(Trie::Node *node, int screenWidth, int screenHeight);
 private:
 };

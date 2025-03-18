@@ -485,7 +485,10 @@ void drawArrowLine(Vector2 start, Vector2 end, float thickness, Color color)
 }
 void DrawTrie(Trie::Node *node, int screenWidth, int screenHeight)
 {
-    // Vẽ nút (vẽ thành hình tròn)
+    if (!node)
+        return;
+    if (node->cnt <= 0)
+        return;
     if (node->exist)
     {
         DrawCircle(node->x, node->y, nodeRadius, GREEN);
@@ -521,58 +524,82 @@ void DrawTrie(Trie::Node *node, int screenWidth, int screenHeight)
     }
 }
 
-void Renderer::RenderTrie(Trie &trie)
-{
-    BeginDrawing();
-    ClearBackground(RAYWHITE);
-
-    DrawTrie(trie.root, GetScreenWidth(), GetScreenHeight());
-
-    EndDrawing();
-}
-
-void Renderer::Render()
+void Renderer::RenderTrie()
 {
     static Trie trie;
-    static char trieInputBuffer[MAX_INPUT_CHARS + 1] = {0}; // Buffer for Trie input
-    static int trieInputIndex = 0;                          // Index for Trie input buffer
     static int framesCounter = 0;
     static bool trieInputActive = false; // Flag to indicate if the Trie input box is active
-
-    Rectangle trieInputBox = {800, 500, 200, 50}; // Position and size of the Trie input box
+    Rectangle inputBox = {800, 200, 200, 50};
+    Rectangle searchBox = {800, 300, 200, 50};
+    Rectangle removeBox = {800, 400, 200, 50};
+    static int inputIndex = 0;  // Index for input buffer
+    static int searchIndex = 0; // Index for search buffer
+    static int removeIndex = 0;
+    static char inputBuffer[MAX_INPUT_CHARS + 1] = {0};  // Buffer for input
+    static char searchBuffer[MAX_INPUT_CHARS + 1] = {0}; // Buffer for search input
+    static char removeBuffer[MAX_INPUT_CHARS + 1] = {0}; // Buffer for remove input
+    static bool inputActive = false;
+    static bool searchActive = false;
+    static bool removeActive = false;
     ClearBackground(RAYWHITE);
 
-    // Draw Trie input box
-    DrawRectangleRec(trieInputBox, LIGHTGRAY);
-    DrawText(trieInputBuffer, 810, 515, 20, BLACK);
+    DrawInputBoxes(inputBox, searchBox, removeBox, inputBuffer, searchBuffer, removeBuffer, framesCounter, inputActive, searchActive, removeActive);
 
-    if (((framesCounter / 20) % 2) == 0 && trieInputActive && strlen(trieInputBuffer) < MAX_INPUT_CHARS)
+    HandleInput(inputBox, inputBuffer, inputIndex, inputActive);
+    HandleInput(searchBox, searchBuffer, searchIndex, searchActive);
+    HandleInput(removeBox, removeBuffer, removeIndex, removeActive);
+
+    if (IsKeyPressed(KEY_ENTER))
     {
-        DrawText("_", 810 + MeasureText(trieInputBuffer, 20), 515, 20, BLACK);
-    }
-
-    // Handle Trie input
-    HandleInput(trieInputBox, trieInputBuffer, trieInputIndex, trieInputActive);
-
-    if (IsKeyPressed(KEY_ENTER) && trieInputActive)
-    {
-        std::string inputString(trieInputBuffer);
-        if (is_valid_input(inputString))
+        if (inputActive)
         {
-            trie.add_string(inputString);
+            std::string inputString(inputBuffer);
+            if (is_valid_input(inputString))
+            {
+                trie.add_string(inputString);
 
-            // Recompute positions after adding a new string
-            float currentX = 40;
-            float horizontalSpacing = 80;
-            float verticalSpacing = 80;
-            trie.compute_positions(trie.root, 1, currentX, horizontalSpacing, verticalSpacing);
+                // Recompute positions after adding a new string
+                float currentX = 40;
+                float horizontalSpacing = 80;
+                float verticalSpacing = 80;
+                trie.compute_positions(trie.root, 1, currentX, horizontalSpacing, verticalSpacing);
 
-            // Clear the input buffer
-            trieInputIndex = 0;
-            trieInputBuffer[0] = '\0';
+                // Clear the input buffer
+                inputIndex = 0;
+                inputBuffer[0] = '\0';
+            }
+        }
+        else if (removeActive)
+        {
+            std::string removeString(removeBuffer);
+            if (is_valid_input(removeString))
+            {
+                trie.delete_string(removeString);
+                // Recompute positions after removing a string
+                float currentX = 40;
+                float horizontalSpacing = 80;
+                float verticalSpacing = 80;
+                trie.compute_positions(trie.root, 1, currentX, horizontalSpacing, verticalSpacing);
+
+                // Clear the remove buffer
+                removeIndex = 0;
+                removeBuffer[0] = '\0';
+            }
+        }
+        else if (searchActive)
+        {
+            std::string searchString(searchBuffer);
+            if (is_valid_input(searchString))
+            {
+                if (trie.find_string(searchString))
+                {
+                    // Highlight the found string
+                }
+                searchIndex = 0;
+                searchBuffer[0] = '\0';
+            }
         }
     }
     framesCounter++;
-    // Render the Trie
-    RenderTrie(trie);
+    DrawTrie(trie.root, GetScreenWidth(), GetScreenHeight());
 }

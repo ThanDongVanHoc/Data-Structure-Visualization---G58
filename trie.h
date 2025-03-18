@@ -25,13 +25,12 @@ struct Trie
             color = BLACK;
         }
     };
-
+    Trie();
     int cur;
     Node *root;
-    Trie();
     void updateSpringAnimation(Node *node, float stiffness, float damping, float dt, float speedMultiplier);
     void add_string(std::string s);
-    bool delete_string_recursive(Node *p, std::string &s, int i);
+    bool delete_string_recursive(Node *&p, std::string &s, int i);
     void delete_string(std::string s);
     bool find_string(std::string s);
     void compute_positions(Node *node, int depth, float &currentX, float horizontalSpacing, float verticalSpacing);
