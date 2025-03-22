@@ -1,15 +1,17 @@
 #include "trie.h"
 #include <algorithm>
 #include <cmath>
-#include "raylib.h" // Include raylib for drawing functions
-#include <thread>   // Include thread for sleep
+#include "raylib.h"
+#include <thread>
 #include "renderer.h"
-#include <fstream> // Include fstream for file operations
+#include <fstream>
 using namespace std;
+
 Trie::Trie() : cur(0)
 {
     root = new Node();
 }
+
 std::vector<std::string> insertPseudocode = {
     "function insert(root, word):",
     "    node = root",
@@ -59,64 +61,49 @@ void DrawPseudocode(const std::vector<std::string> &pseudocode, int currentStep,
 
     for (int i = 0; i < int(pseudocode.size()); ++i)
     {
-        if (i == currentStep)
-        {
-            DrawText(pseudocode[i].c_str(), rectX + 10, rectY + 10 + i * 20, 20, RED);
-        }
-        else
-        {
-            DrawText(pseudocode[i].c_str(), rectX + 10, rectY + 10 + i * 20, 20, BLACK);
-        }
+        DrawText(pseudocode[i].c_str(), rectX + 10, rectY + 10 + i * 20, 20, (i == currentStep) ? RED : BLACK);
     }
 }
+
 bool Trie::check(Node *node)
 {
-    if (node == NULL)
+    if (!node)
         return true;
     if (node->targetX != node->x || node->targetY != node->y)
         return false;
-    bool res = true;
-    for (int i = 0; i < 52; i++) // Thay đổi kích thước mảng
+    for (int i = 0; i < 52; i++)
     {
-        if (node->child[i] != NULL)
-            res = min(res, check(node->child[i]));
+        if (node->child[i] && !check(node->child[i]))
+            return false;
     }
-    return res;
+    return true;
 }
+
+void Trie::animateNode(Node *node, int step, const std::vector<std::string> &pseudocode, bool delay)
+{
+    DrawTrie(root, GetScreenWidth(), GetScreenHeight());
+    DrawPseudocode(pseudocode, step, GetScreenWidth(), GetScreenHeight());
+    EndDrawing();
+    if (delay)
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    BeginDrawing();
+    ClearBackground(RAYWHITE);
+}
+
 void Trie::add_string(std::string s)
 {
     Node *p = root;
     p->cnt++;
-    DrawTrie(root, GetScreenWidth(), GetScreenHeight());
-    DrawPseudocode(insertPseudocode, 1, GetScreenWidth(), GetScreenHeight());
-    EndDrawing();
-    std::this_thread::sleep_for(std::chrono::milliseconds(300));
-    BeginDrawing();
-    ClearBackground(RAYWHITE);
+    animateNode(root, 1, insertPseudocode, 1);
     for (auto f : s)
     {
         p->color = YELLOW;
-        DrawTrie(root, GetScreenWidth(), GetScreenHeight());
-        DrawPseudocode(insertPseudocode, 2, GetScreenWidth(), GetScreenHeight());
-        EndDrawing();
-        std::this_thread::sleep_for(std::chrono::milliseconds(300));
-        BeginDrawing();
-        ClearBackground(RAYWHITE);
+        animateNode(root, 2, insertPseudocode, 1);
         p->color = BLACK;
-        int c;
-        if (f >= 'a' && f <= 'z')
-            c = f - 'a';
-        else if (f >= 'A' && f <= 'Z')
-            c = f - 'A' + 26; // Adjust index for uppercase letters
-
-        if (p->child[c] == NULL)
+        int c = (f >= 'a' && f <= 'z') ? f - 'a' : f - 'A' + 26;
+        if (!p->child[c])
         {
-            DrawTrie(root, GetScreenWidth(), GetScreenHeight());
-            DrawPseudocode(insertPseudocode, 3, GetScreenWidth(), GetScreenHeight());
-            EndDrawing();
-            std::this_thread::sleep_for(std::chrono::milliseconds(300));
-            BeginDrawing();
-            ClearBackground(RAYWHITE);
+            animateNode(root, 3, insertPseudocode, 1);
             p->child[c] = new Node();
             p = p->child[c];
             p->character = f;
@@ -128,15 +115,11 @@ void Trie::add_string(std::string s)
             float stiffness = 3.5f;
             float damping = 0.75f;
             int step = 0;
-            while (!check(root) && step <= 50)
+            while (step <= 50)
             {
                 double dt = 0.1;
                 updateSpringAnimation(root, stiffness, damping, dt, 1.0f);
-                DrawTrie(root, GetScreenWidth(), GetScreenHeight());
-                DrawPseudocode(insertPseudocode, 4, GetScreenWidth(), GetScreenHeight());
-                EndDrawing();
-                BeginDrawing();
-                ClearBackground(RAYWHITE);
+                animateNode(root, 4, insertPseudocode, 0);
                 step++;
             }
         }
@@ -146,35 +129,19 @@ void Trie::add_string(std::string s)
             p->character = f;
             p->cnt++;
         }
-        DrawTrie(root, GetScreenWidth(), GetScreenHeight());
-        DrawPseudocode(insertPseudocode, 5, GetScreenWidth(), GetScreenHeight());
-        EndDrawing();
-        std::this_thread::sleep_for(std::chrono::milliseconds(300));
-        BeginDrawing();
-        ClearBackground(RAYWHITE);
+        animateNode(root, 5, insertPseudocode, 1);
     }
     p->color = YELLOW;
-    DrawTrie(root, GetScreenWidth(), GetScreenHeight());
-    DrawPseudocode(insertPseudocode, 7, GetScreenWidth(), GetScreenHeight());
-    EndDrawing();
-    std::this_thread::sleep_for(std::chrono::milliseconds(300)); // Delay for animation
-    BeginDrawing();
-    ClearBackground(RAYWHITE);
+    animateNode(root, 7, insertPseudocode, 1);
     p->color = BLACK;
     p->exist++;
 }
 
 bool Trie::delete_string_recursive(Node *&p, std::string &s, int i)
 {
-
     if (i != (int)s.size())
     {
-        int c;
-        if (s[i] >= 'a' && s[i] <= 'z')
-            c = s[i] - 'a';
-        else if (s[i] >= 'A' && s[i] <= 'Z')
-            c = s[i] - 'A' + 26; // Điều chỉnh chỉ số cho chữ cái in hoa
-
+        int c = (s[i] >= 'a' && s[i] <= 'z') ? s[i] - 'a' : s[i] - 'A' + 26;
         bool isChildDeleted = delete_string_recursive(p->child[c], s, i + 1);
         if (isChildDeleted)
             p->child[c] = NULL;
@@ -184,11 +151,6 @@ bool Trie::delete_string_recursive(Node *&p, std::string &s, int i)
         p->exist--;
     }
     p->color = YELLOW;
-    DrawTrie(root, GetScreenWidth(), GetScreenHeight());
-    EndDrawing();
-    std::this_thread::sleep_for(std::chrono::milliseconds(300)); // Delay for animation
-    BeginDrawing();
-    ClearBackground(RAYWHITE);
     if (p != root)
     {
         p->cnt--;
@@ -200,24 +162,21 @@ bool Trie::delete_string_recursive(Node *&p, std::string &s, int i)
             float horizontalSpacing = 80;
             float verticalSpacing = 80;
             compute_positions(root, 1, currentX, horizontalSpacing, verticalSpacing);
-            float stiffness = 3.5f; // Tăng độ cứng: chuyển từ 0.2f sang 1.0f để animation nhanh hơn
-            float damping = 0.75f;  // Điều chỉnh damping: có thể thử với 0.9f để ổn định chuyển động
+            float stiffness = 3.5f;
+            float damping = 0.75f;
             int step = 0;
             while (step <= 50)
             {
-                double dt = 0.1;
-                updateSpringAnimation(root, stiffness, damping, dt, 1.0f);
-                DrawTrie(root, GetScreenWidth(), GetScreenHeight());
-                EndDrawing();
-                BeginDrawing();
-                ClearBackground(RAYWHITE);
+                updateSpringAnimation(root, stiffness, damping, 0.1, 1.0f);
                 step++;
             }
             return true;
         }
     }
     else
+    {
         p->cnt--;
+    }
     p->color = BLACK;
     return false;
 }
@@ -227,91 +186,56 @@ void Trie::delete_string(std::string s)
     if (!find_string(s))
         return;
     delete_string_recursive(root, s, 0);
-    return;
 }
+
 bool Trie::find_string_red(std::string s)
 {
     Node *p = root;
     for (auto f : s)
     {
         p->color = RED;
-        DrawTrie(root, GetScreenWidth(), GetScreenHeight());
-        EndDrawing();
-        std::this_thread::sleep_for(std::chrono::milliseconds(300)); // Delay for animation
-        BeginDrawing();
-        ClearBackground(RAYWHITE);
-        int c;
-        if (f >= 'a' && f <= 'z')
-            c = f - 'a';
-        else if (f >= 'A' && f <= 'Z')
-            c = f - 'A' + 26; // Điều chỉnh chỉ số cho chữ cái in hoa
-
-        if (p->child[c] == NULL)
+        int c = (f >= 'a' && f <= 'z') ? f - 'a' : f - 'A' + 26;
+        if (!p->child[c])
             return false;
         p = p->child[c];
     }
     p->color = RED;
-    DrawTrie(root, GetScreenWidth(), GetScreenHeight());
-    EndDrawing();
-    std::this_thread::sleep_for(std::chrono::milliseconds(300)); // Delay for animation
-    BeginDrawing();
-    ClearBackground(RAYWHITE);
     return (p->exist != 0);
 }
+
 bool Trie::find_string(std::string s)
 {
     Node *p = root;
     for (auto f : s)
     {
         p->color = YELLOW;
-        DrawTrie(root, GetScreenWidth(), GetScreenHeight());
-        EndDrawing();
-        std::this_thread::sleep_for(std::chrono::milliseconds(300)); // Delay for animation
-        BeginDrawing();
-        ClearBackground(RAYWHITE);
         p->color = BLACK;
-        int c;
-        if (f >= 'a' && f <= 'z')
-            c = f - 'a';
-        else if (f >= 'A' && f <= 'Z')
-            c = f - 'A' + 26; // Điều chỉnh chỉ số cho chữ cái in hoa
-
-        if (p->child[c] == NULL)
+        int c = (f >= 'a' && f <= 'z') ? f - 'a' : f - 'A' + 26;
+        if (!p->child[c])
             return false;
         p = p->child[c];
     }
     p->color = YELLOW;
-    DrawTrie(root, GetScreenWidth(), GetScreenHeight());
-    EndDrawing();
-    std::this_thread::sleep_for(std::chrono::milliseconds(300)); // Delay for animation
-    BeginDrawing();
-    ClearBackground(RAYWHITE);
     p->color = BLACK;
     return (p->exist != 0);
 }
+
 void Trie::updateSpringAnimation(Node *node, float stiffness, float damping, float dt, float speedMultiplier)
 {
-    dt *= speedMultiplier; // Tăng tốc bằng cách nhân dt với hệ số tốc độ
-
-    // Tính gia tốc dựa trên hiệu số giữa target và vị trí hiện tại
+    dt *= speedMultiplier;
     float ax = (node->targetX - node->x) * stiffness;
     float ay = (node->targetY - node->y) * stiffness;
-
-    // Cập nhật vận tốc và áp dụng damping
     node->velocityX = (node->velocityX + ax * dt) * damping;
     node->velocityY = (node->velocityY + ay * dt) * damping;
-
-    // Cập nhật vị trí hiện tại
     node->x += node->velocityX * dt;
     node->y += node->velocityY * dt;
-
-    // Cập nhật cho các node con
     for (int i = 0; i < 52; i++)
     {
-        if (node->child[i] != NULL)
+        if (node->child[i])
             updateSpringAnimation(node->child[i], stiffness, damping, dt, speedMultiplier);
     }
 }
+
 void Trie::compute_positions(Node *node, int depth, float &currentX, float horizontalSpacing, float verticalSpacing)
 {
     if (!node)
@@ -358,42 +282,9 @@ void Trie::compute_positions(Node *node, int depth, float &currentX, float horiz
     }
 }
 
-void Trie::visualize(Node *node, int depth, int &x, std::vector<std::vector<Node *>> &levels)
-{
-    if (node == nullptr)
-        return;
-
-    float currentX = 40.0f;
-    float horizontalSpacing = 80.0f;
-    float verticalSpacing = 80.0f;
-    compute_positions(node, 0, currentX, horizontalSpacing, verticalSpacing);
-
-    if (levels.size() <= depth)
-        levels.push_back(std::vector<Node *>());
-
-    for (int i = 0; i < 52; ++i) // Thay đổi kích thước mảng
-    {
-        if (node->child[i] != nullptr)
-        {
-            visualize(node->child[i], depth + 1, x, levels);
-        }
-    }
-
-    node->x = x++;
-    node->y = depth;
-    levels[depth].push_back(node);
-}
-
 bool is_valid_input(const std::string &s)
 {
-    for (char c : s)
-    {
-        if (!isalpha(c))
-        {
-            return false;
-        }
-    }
-    return true;
+    return std::all_of(s.begin(), s.end(), ::isalpha);
 }
 
 void Trie::load_from_file(const std::string &filename)
@@ -404,15 +295,11 @@ void Trie::load_from_file(const std::string &filename)
         std::cerr << "Failed to open file: " << filename << std::endl;
         return;
     }
-
     std::string line;
     while (std::getline(file, line))
     {
         if (is_valid_input(line))
-        {
             add_string(line);
-        }
     }
-
     file.close();
 }

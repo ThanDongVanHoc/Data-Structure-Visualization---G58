@@ -38,6 +38,7 @@ struct Trie
     bool check(Node *node);
     bool find_string_red(std::string s);
     void load_from_file(const std::string &filename);
+    void animateNode(Node *node, int step, const std::vector<std::string> &pseudocode, bool delay);
 };
 bool is_valid_input(const std::string &s);
 void DrawPseudocode(const std::vector<std::string> &pseudocode, int currentStep, int screenWidth, int screenHeight);
