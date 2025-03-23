@@ -6,6 +6,7 @@
 #include <thread>
 #include <string>
 #include "trie.h"
+#include <fstream>
 #define MAX_INPUT_CHARS 9
 int nodeRadius = 20;
 using namespace std;
@@ -72,24 +73,25 @@ void DrawInputBoxes(Rectangle inputBox, Rectangle searchBox, Rectangle removeBox
 {
     // Draw input box
     DrawRectangleRec(inputBox, LIGHTGRAY);
-    DrawText(inputBuffer, 810, 215, 20, BLACK);
-
+    DrawText(inputBuffer, 1210, 215, 20, BLACK);
+    DrawText("Insert", 1200, 180, 20, BLACK);
     // Draw search box
     DrawRectangleRec(searchBox, LIGHTGRAY);
-    DrawText(searchBuffer, 810, 315, 20, BLACK);
-
+    DrawText(searchBuffer, 1210, 315, 20, BLACK);
+    DrawText("Search", 1200, 280, 20, BLACK);
     // Draw remove box
     DrawRectangleRec(removeBox, LIGHTGRAY);
-    DrawText(removeBuffer, 810, 415, 20, BLACK);
+    DrawText(removeBuffer, 1210, 415, 20, BLACK);
+    DrawText("Remove", 1200, 380, 20, BLACK);
 
     if (((framesCounter / 20) % 2) == 0)
     {
         if (inputActive && strlen(inputBuffer) < MAX_INPUT_CHARS)
-            DrawText("_", 810 + MeasureText(inputBuffer, 20), 215, 20, BLACK);
+            DrawText("_", 1210 + MeasureText(inputBuffer, 20), 215, 20, BLACK);
         if (searchActive && strlen(searchBuffer) < MAX_INPUT_CHARS)
-            DrawText("_", 810 + MeasureText(searchBuffer, 20), 315, 20, BLACK);
+            DrawText("_", 1210 + MeasureText(searchBuffer, 20), 315, 20, BLACK);
         if (removeActive && strlen(removeBuffer) < MAX_INPUT_CHARS)
-            DrawText("_", 810 + MeasureText(removeBuffer, 20), 415, 20, BLACK);
+            DrawText("_", 1210 + MeasureText(removeBuffer, 20), 415, 20, BLACK);
     }
 }
 
@@ -523,17 +525,32 @@ void DrawTrie(Trie::Node *node, int screenWidth, int screenHeight)
         }
     }
 }
-
+void resetcolor(Trie::Node *node)
+{
+    if (!node)
+        return;
+    if (node->cnt <= 0)
+        return;
+    node->color = BLACK;
+    for (int i = 0; i < 52; i++)
+    {
+        if (node->child[i] != NULL)
+            resetcolor(node->child[i]);
+    }
+    return;
+}
 void Renderer::RenderTrie()
 {
     static Trie trie;
     static int framesCounter = 0;
     static bool trieInputActive = false; // Flag to indicate if the Trie input box is active
-    Rectangle inputBox = {800, 200, 200, 50};
-    Rectangle searchBox = {800, 300, 200, 50};
-    Rectangle removeBox = {800, 400, 200, 50};
-    static int inputIndex = 0;  // Index for input buffer
-    static int searchIndex = 0; // Index for search buffer
+    Rectangle inputBox = {1200, 200, 200, 50};
+    Rectangle searchBox = {1200, 300, 200, 50};
+    Rectangle removeBox = {1200, 400, 200, 50};
+    Rectangle loadButton = {1200, 500, 200, 50};  // Add a button for loading the file
+    Rectangle clearButton = {1200, 600, 200, 50}; // Add a button for clearing the Trie tree
+    static int inputIndex = 0;                    // Index for input buffer
+    static int searchIndex = 0;                   // Index for search buffer
     static int removeIndex = 0;
     static char inputBuffer[MAX_INPUT_CHARS + 1] = {0};  // Buffer for input
     static char searchBuffer[MAX_INPUT_CHARS + 1] = {0}; // Buffer for search input
@@ -548,9 +565,26 @@ void Renderer::RenderTrie()
     HandleInput(inputBox, inputBuffer, inputIndex, inputActive);
     HandleInput(searchBox, searchBuffer, searchIndex, searchActive);
     HandleInput(removeBox, removeBuffer, removeIndex, removeActive);
-
+    if (CheckButton(loadButton, "Load from file"))
+    {
+        const char *filename = "data.txt";
+        resetcolor(trie.root);
+        if (filename)
+        {
+            trie.load_from_file(filename);
+            float currentX = 40;
+            float horizontalSpacing = 80;
+            float verticalSpacing = 80;
+            trie.compute_positions(trie.root, 1, currentX, horizontalSpacing, verticalSpacing);
+        }
+    }
+    if (CheckButton(clearButton, "Clear Trie"))
+    {
+        trie = Trie(); // Reinitialize the Trie to clear it
+    }
     if (IsKeyPressed(KEY_ENTER))
     {
+        resetcolor(trie.root);
         if (inputActive)
         {
             std::string inputString(inputBuffer);
@@ -562,7 +596,6 @@ void Renderer::RenderTrie()
                 float currentX = 40;
                 float horizontalSpacing = 80;
                 float verticalSpacing = 80;
-                trie.compute_positions(trie.root, 1, currentX, horizontalSpacing, verticalSpacing);
 
                 // Clear the input buffer
                 inputIndex = 0;
@@ -591,7 +624,7 @@ void Renderer::RenderTrie()
             std::string searchString(searchBuffer);
             if (is_valid_input(searchString))
             {
-                trie.find_string(searchString);
+                trie.find_string_red(searchString);
                 searchIndex = 0;
                 searchBuffer[0] = '\0';
             }
