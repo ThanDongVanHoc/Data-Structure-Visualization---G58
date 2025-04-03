@@ -3,10 +3,11 @@
 #include <cstdlib>
 #include <ctime>
 #include <bits/stdc++.h>
+#include "var.h"
 using namespace std;
 const int MAX_INPUT_CHARS = 10;
-std::vector<std::vector<Edge>> adj;
-vector<vector<Color>> color_edge;
+std::vector<std::vector<spedge>> adj;
+vector<vector<Color>> color_spedge;
 typedef pair<int, int> ii;
 void drawArrowLine_graph(Vector2 start, Vector2 end, float thickness, Color color)
 {
@@ -36,30 +37,65 @@ void drawArrowLine_graph(Vector2 start, Vector2 end, float thickness, Color colo
     // Vẽ tam giác đầy làm đầu mũi tên
     DrawTriangle(arrowTip, arrowRight, arrowLeft, color);
 }
-void animate(std::vector<Node> &nodes, std::vector<Edge> &edges)
+
+void animationedge(int u, int v, const std::vector<spnode> &spnodes, std::vector<spedge> &spedges, Color color)
 {
-    float nodeRadius = 20.0f;
-    int selectedNode = -1;
-    RenderGraph(nodes, edges, selectedNode, nodeRadius);
+    float spedgeLength = EuclideanDistance(spnodes[u].position, spnodes[v].position);
+    // cout << spedgeLength << endl;
+
+    Vector2 parentCenter = {spnodes[u].position.x, spnodes[u].position.y};
+    Vector2 childCenter = {spnodes[v].position.x, spnodes[v].position.y};
+
+    // Tính vector chỉ phương từ cha đến con
+    Vector2 direction = {childCenter.x - parentCenter.x, childCenter.y - parentCenter.y};
+    float len = sqrt(direction.x * direction.x + direction.y * direction.y);
+    if (len != 0)
+    {
+        direction.x /= len;
+        direction.y /= len;
+    }
+    int spnodeRadius = 20;
+    // Tính điểm bắt đầu và kết thúc: cách tâm một khoảng bằng bán kính
+    Vector2 startspedge = {parentCenter.x + direction.x * spnodeRadius, parentCenter.y + direction.y * spnodeRadius};
+    Vector2 endspedge = {childCenter.x - direction.x * spnodeRadius, childCenter.y - direction.y * spnodeRadius};
+    int thickness = 4.0f;
+    for (float step = 0.1; step <= 1.0; step += 0.015f)
+    {
+        Vector2 direct = {startspedge.x + double((endspedge.x - startspedge.x) * step), startspedge.y + double((endspedge.y - startspedge.y) * step)};
+        float spnodeRadius = 20.0f;
+        int selectedspnode = -1;
+        RenderGraph(spnodes, spedges, selectedspnode, spnodeRadius);
+        DrawLineEx(startspedge, direct, thickness, color);
+        EndDrawing();
+        BeginDrawing();
+        ClearBackground(RAYWHITE);
+    }
+    return;
+}
+void animate(std::vector<spnode> &spnodes, std::vector<spedge> &spedges)
+{
+    float spnodeRadius = 20.0f;
+    int selectedspnode = -1;
+    RenderGraph(spnodes, spedges, selectedspnode, spnodeRadius);
     EndDrawing();
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     BeginDrawing();
+    std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Delay for animation
     ClearBackground(RAYWHITE);
 }
-void Dijkstra(int start, vector<Node> &nodes, std::vector<Edge> &edges)
+void Dijkstra(int start, vector<spnode> &spnodes, std::vector<spedge> &spedges)
 {
     std::vector<int> previous;
     std::vector<float> distances;
-    previous.resize(nodes.size() + 1);
-    distances.resize(nodes.size() + 1);
-    int n = nodes.size();
+    previous.resize(spnodes.size() + 1);
+    distances.resize(spnodes.size() + 1);
+    int n = spnodes.size();
     long long INF = 1e9 + 7;
     distances.assign(n, INF);
     previous.assign(n, -1);
     distances[start] = 0;
     priority_queue<ii, vector<ii>, greater<ii>> pq;
     pq.push({0, start});
-    nodes[start].text = "source,0";
+    spnodes[start].text = "source,0";
     while (!pq.empty())
     {
         auto k = pq.top();
@@ -68,52 +104,54 @@ void Dijkstra(int start, vector<Node> &nodes, std::vector<Edge> &edges)
         pq.pop();
         if (currentDist > distances[u])
             continue;
-        nodes[u].color = RED;
-        animate(nodes, edges);
-        for (const auto &edge : adj[u])
+        spnodes[u].color = RED;
+        animate(spnodes, spedges);
+        for (const auto &spedge : adj[u])
         {
-            int v = edge.end;
+            int v = spedge.end;
             if (v == u)
-                v = edge.start;
-            int weight = edge.weight;
+                v = spedge.start;
+            int weight = spedge.weight;
             if (distances[u] + weight < distances[v])
             {
-
-                color_edge[u][v] = ORANGE;
-                color_edge[v][u] = ORANGE;
-                nodes[v].text = std::to_string(int(distances[u] + weight));
+                animationedge(u, v, spnodes, spedges, ORANGE);
+                color_spedge[u][v] = ORANGE;
+                color_spedge[v][u] = ORANGE;
+                spnodes[v].text = std::to_string(int(distances[u] + weight));
                 if (previous[v] != -1)
                 {
-                    color_edge[previous[v]][v] = GRAY;
-                    color_edge[v][previous[v]] = GRAY;
+                    animationedge(previous[v], v, spnodes, spedges, GRAY);
+                    color_spedge[previous[v]][v] = GRAY;
+                    color_spedge[v][previous[v]] = GRAY;
                 }
-                animate(nodes, edges);
+                animate(spnodes, spedges);
                 distances[v] = distances[u] + weight;
                 previous[v] = u;
                 pq.push({distances[v], v});
             }
             else if (distances[u] + weight > distances[v])
             {
-                color_edge[u][v] = GRAY;
-                color_edge[v][u] = GRAY;
-                animate(nodes, edges);
+                animationedge(u, v, spnodes, spedges, GRAY);
+                color_spedge[u][v] = GRAY;
+                color_spedge[v][u] = GRAY;
+                animate(spnodes, spedges);
             }
         }
     }
 }
-void resetcolor(std::vector<Node> &nodes)
+void resetcolor(std::vector<spnode> &spnodes)
 {
-    for (int i = 0; i < nodes.size(); i++)
+    for (int i = 0; i < int(spnodes.size()); i++)
     {
-        nodes[i].color = BLACK;
-        nodes[i].text = "INF";
+        spnodes[i].color = BLACK;
+        spnodes[i].text = "INF";
     }
-    for (int i = 0; i < nodes.size(); i++)
+    for (int i = 0; i < int(spnodes.size()); i++)
     {
-        for (auto &edge : adj[i])
+        for (auto &spedge : adj[i])
         {
-            color_edge[edge.start][edge.end] = BLACK;
-            color_edge[edge.end][edge.start] = BLACK;
+            color_spedge[spedge.start][spedge.end] = BLACK;
+            color_spedge[spedge.end][spedge.start] = BLACK;
         }
     }
 }
@@ -123,85 +161,85 @@ float EuclideanDistance(Vector2 a, Vector2 b)
     float dy = a.y - b.y;
     return sqrtf(dx * dx + dy * dy);
 }
-void InitializeGraph(std::vector<Node> &nodes, std::vector<Edge> &edges, int screenWidth, int screenHeight)
+void InitializeGraph(std::vector<spnode> &spnodes, std::vector<spedge> &spedges, int screenWidth, int screenHeight)
 {
-    const int numNodes = 9;
+    const int numspnodes = 9;
     srand(static_cast<unsigned>(time(nullptr)));
-    nodes.resize(numNodes);
-    color_edge.resize(numNodes);
-    for (int i = 0; i < numNodes; i++)
+    spnodes.resize(numspnodes);
+    color_spedge.resize(numspnodes);
+    for (int i = 0; i < numspnodes; i++)
     {
-        color_edge[i].resize(numNodes, BLACK);
+        color_spedge[i].resize(numspnodes, BLACK);
     }
-    for (int i = 0; i < numNodes; i++)
+    for (int i = 0; i < numspnodes; i++)
     {
-        nodes[i].position = {static_cast<float>(rand() % screenWidth), static_cast<float>(rand() % screenHeight)};
-        nodes[i].velocity = {0, 0};
+        spnodes[i].position = {static_cast<float>(rand() % screenWidth), static_cast<float>(rand() % screenHeight)};
+        spnodes[i].velocity = {0, 0};
     }
-    edges.push_back(Edge(0, 1, 8));
-    edges.push_back(Edge(0, 2, 12));
-    edges.push_back(Edge(1, 2, 13));
-    edges.push_back(Edge(1, 3, 25));
-    edges.push_back(Edge(2, 3, 14));
-    edges.push_back(Edge(2, 6, 21));
-    edges.push_back(Edge(3, 4, 20));
-    edges.push_back(Edge(3, 5, 8));
-    edges.push_back(Edge(3, 6, 12));
-    edges.push_back(Edge(3, 7, 12));
-    edges.push_back(Edge(3, 8, 16));
-    edges.push_back(Edge(4, 1, 9));
-    edges.push_back(Edge(4, 5, 19));
-    edges.push_back(Edge(5, 7, 11));
-    edges.push_back(Edge(6, 8, 11));
-    edges.push_back(Edge(7, 8, 9));
-    adj.resize(nodes.size());
+    spedges.push_back(spedge(0, 1, 8));
+    spedges.push_back(spedge(0, 2, 12));
+    spedges.push_back(spedge(1, 2, 13));
+    spedges.push_back(spedge(1, 3, 25));
+    spedges.push_back(spedge(2, 3, 14));
+    spedges.push_back(spedge(2, 6, 21));
+    spedges.push_back(spedge(3, 4, 20));
+    spedges.push_back(spedge(3, 5, 8));
+    spedges.push_back(spedge(3, 6, 12));
+    spedges.push_back(spedge(3, 7, 12));
+    spedges.push_back(spedge(3, 8, 16));
+    spedges.push_back(spedge(4, 1, 9));
+    spedges.push_back(spedge(4, 5, 19));
+    spedges.push_back(spedge(5, 7, 11));
+    spedges.push_back(spedge(6, 8, 11));
+    spedges.push_back(spedge(7, 8, 9));
+    adj.resize(spnodes.size());
 
     // Duyệt qua các cạnh và thêm vào danh sách kề
-    for (const auto &edge : edges)
+    for (const auto &spedge : spedges)
     {
-        adj[edge.start].push_back(edge);
+        adj[spedge.start].push_back(spedge);
     }
 }
 
-void UpdateGraph(std::vector<Node> &nodes, std::vector<Edge> &edges, int &selectedNode, float C_rep, float c_spring, float L, float timeStep, float damping, int physicsIterations, float nodeRadius, int screenWidth, int screenHeight)
+void UpdateGraph(std::vector<spnode> &spnodes, std::vector<spedge> &spedges, int &selectedspnode, float C_rep, float c_spring, float L, float timeStep, float damping, int physicsIterations, float spnodeRadius, int screenWidth, int screenHeight)
 {
     Vector2 mousePos = GetMousePosition();
 
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
     {
-        for (int i = 0; i < nodes.size(); i++)
+        for (int i = 0; i < int(spnodes.size()); i++)
         {
-            if (EuclideanDistance(mousePos, nodes[i].position) <= nodeRadius * 1.5f)
+            if (EuclideanDistance(mousePos, spnodes[i].position) <= spnodeRadius * 1.5f)
             {
-                selectedNode = i;
+                selectedspnode = i;
                 break;
             }
         }
     }
 
-    if (selectedNode != -1 && IsMouseButtonDown(MOUSE_LEFT_BUTTON))
+    if (selectedspnode != -1 && IsMouseButtonDown(MOUSE_LEFT_BUTTON))
     {
-        nodes[selectedNode].position = mousePos;
-        nodes[selectedNode].velocity = {0, 0};
+        spnodes[selectedspnode].position = mousePos;
+        spnodes[selectedspnode].velocity = {0, 0};
     }
 
     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
     {
-        selectedNode = -1;
+        selectedspnode = -1;
     }
 
     for (int iter = 0; iter < physicsIterations; iter++)
     {
-        std::vector<Vector2> forces(nodes.size(), {0, 0});
+        std::vector<Vector2> forces(spnodes.size(), {0, 0});
 
-        // Tính lực đẩy giữa các node
-        for (int i = 0; i < nodes.size(); i++)
+        // Tính lực đẩy giữa các spnode
+        for (int i = 0; i < int(spnodes.size()); i++)
         {
-            for (int j = i + 1; j < nodes.size(); j++)
+            for (int j = i + 1; j < int(spnodes.size()); j++)
             {
-                Vector2 delta = {nodes[i].position.x - nodes[j].position.x,
-                                 nodes[i].position.y - nodes[j].position.y};
-                float dist = EuclideanDistance(nodes[i].position, nodes[j].position);
+                Vector2 delta = {spnodes[i].position.x - spnodes[j].position.x,
+                                 spnodes[i].position.y - spnodes[j].position.y};
+                float dist = EuclideanDistance(spnodes[i].position, spnodes[j].position);
                 if (dist < 0.1f)
                     dist = 0.1f;
                 float rep = C_rep / (dist * dist);
@@ -216,13 +254,13 @@ void UpdateGraph(std::vector<Node> &nodes, std::vector<Edge> &edges, int &select
         }
 
         // Tính lực hút trên các cạnh
-        for (auto &edge : edges)
+        for (auto &spedge : spedges)
         {
-            int u = edge.start;
-            int v = edge.end;
-            Vector2 delta = {nodes[u].position.x - nodes[v].position.x,
-                             nodes[u].position.y - nodes[v].position.y};
-            float dist = EuclideanDistance(nodes[u].position, nodes[v].position);
+            int u = spedge.start;
+            int v = spedge.end;
+            Vector2 delta = {spnodes[u].position.x - spnodes[v].position.x,
+                             spnodes[u].position.y - spnodes[v].position.y};
+            float dist = EuclideanDistance(spnodes[u].position, spnodes[v].position);
             if (dist < 0.1f)
                 dist = 0.1f;
             float disp = dist - L;
@@ -236,48 +274,50 @@ void UpdateGraph(std::vector<Node> &nodes, std::vector<Edge> &edges, int &select
             forces[v].y += forceAtt.y;
         }
 
-        for (int i = 0; i < nodes.size(); i++)
+        for (int i = 0; i < int(spnodes.size()); i++)
         {
-            if (i == selectedNode)
+            if (i == selectedspnode)
                 continue;
-            nodes[i].velocity.x = (nodes[i].velocity.x + forces[i].x * timeStep) * damping;
-            nodes[i].velocity.y = (nodes[i].velocity.y + forces[i].y * timeStep) * damping;
-            nodes[i].position.x += nodes[i].velocity.x * timeStep;
-            nodes[i].position.y += nodes[i].velocity.y * timeStep;
+            spnodes[i].velocity.x = (spnodes[i].velocity.x + forces[i].x * timeStep) * damping;
+            spnodes[i].velocity.y = (spnodes[i].velocity.y + forces[i].y * timeStep) * damping;
+            spnodes[i].position.x += spnodes[i].velocity.x * timeStep;
+            spnodes[i].position.y += spnodes[i].velocity.y * timeStep;
 
-            if (nodes[i].position.x < nodeRadius)
-                nodes[i].position.x = nodeRadius;
-            if (nodes[i].position.y < nodeRadius)
-                nodes[i].position.y = nodeRadius;
-            if (nodes[i].position.x > screenWidth - nodeRadius)
-                nodes[i].position.x = screenWidth - nodeRadius;
-            if (nodes[i].position.y > screenHeight - nodeRadius)
-                nodes[i].position.y = screenHeight - nodeRadius;
+            if (spnodes[i].position.x < spnodeRadius)
+                spnodes[i].position.x = spnodeRadius;
+            if (spnodes[i].position.y < spnodeRadius)
+                spnodes[i].position.y = spnodeRadius;
+            if (spnodes[i].position.x > screenWidth - spnodeRadius)
+                spnodes[i].position.x = screenWidth - spnodeRadius;
+            if (spnodes[i].position.y > screenHeight - spnodeRadius)
+                spnodes[i].position.y = screenHeight - spnodeRadius;
         }
     }
 }
 void DrawCenteredText(const std::string &text, Vector2 position, int fontSize, Color color)
 {
     // Tính chiều rộng của chuỗi
-    float textWidth = MeasureText(text.c_str(), fontSize);
+    float textWidth = MeasureText(text.c_str(), GetFont().baseSize);
 
     // Điều chỉnh tọa độ x để căn giữa
     float centeredX = position.x - textWidth / 2.0f;
 
     // Vẽ chuỗi tại vị trí đã điều chỉnh
-    DrawText(text.c_str(), (centeredX), (position.y), fontSize, color);
+    // DrawText(text.c_str(), (centeredX), (position.y), fontSize, color);
+    DrawTextEx(GetFont(), text.c_str(), {float(centeredX), float(position.y)}, GetFont().baseSize, 1, color);
 }
-void RenderGraph(const std::vector<Node> &nodes, const std::vector<Edge> &edges, int selectedNode, float nodeRadius)
+void RenderGraph(const std::vector<spnode> &spnodes, const std::vector<spedge> &spedges, int selectedspnode, float spnodeRadius)
 {
-    for (int i = 0; i < nodes.size(); i++)
+    DrawCenteredText("Dijkstra Visualize", {float(GetScreenWidth() / 2.0f), 100}, GetFont().baseSize * 2, BLACK);
+    for (int i = 0; i < int(spnodes.size()); i++)
     {
-        for (auto edge : adj[i])
+        for (auto spedge : adj[i])
         {
-            float edgeLength = EuclideanDistance(nodes[edge.start].position, nodes[edge.end].position);
-            // cout << edgeLength << endl;
+            float spedgeLength = EuclideanDistance(spnodes[spedge.start].position, spnodes[spedge.end].position);
+            // cout << spedgeLength << endl;
 
-            Vector2 parentCenter = {nodes[edge.start].position.x, nodes[edge.start].position.y};
-            Vector2 childCenter = {nodes[edge.end].position.x, nodes[edge.end].position.y};
+            Vector2 parentCenter = {spnodes[spedge.start].position.x, spnodes[spedge.start].position.y};
+            Vector2 childCenter = {spnodes[spedge.end].position.x, spnodes[spedge.end].position.y};
 
             // Tính vector chỉ phương từ cha đến con
             Vector2 direction = {childCenter.x - parentCenter.x, childCenter.y - parentCenter.y};
@@ -289,90 +329,93 @@ void RenderGraph(const std::vector<Node> &nodes, const std::vector<Edge> &edges,
             }
 
             // Tính điểm bắt đầu và kết thúc: cách tâm một khoảng bằng bán kính
-            Vector2 startEdge = {parentCenter.x + direction.x * nodeRadius, parentCenter.y + direction.y * nodeRadius};
-            Vector2 endEdge = {childCenter.x - direction.x * nodeRadius, childCenter.y - direction.y * nodeRadius};
+            Vector2 startspedge = {parentCenter.x + direction.x * spnodeRadius, parentCenter.y + direction.y * spnodeRadius};
+            Vector2 endspedge = {childCenter.x - direction.x * spnodeRadius, childCenter.y - direction.y * spnodeRadius};
 
-            // DrawLineEx(startEdge, endEdge, 2.0f, color_edge[edge.start][edge.end]);
-            drawArrowLine_graph(startEdge, endEdge, 2.0f, color_edge[edge.start][edge.end]);
+            // DrawLineEx(startspedge, endspedge, 2.0f, color_spedge[spedge.start][spedge.end]);
+            drawArrowLine_graph(startspedge, endspedge, 4.0f, color_spedge[spedge.start][spedge.end]);
             // Tính trung điểm của cạnh
-            Vector2 midPoint = {1.0 * (startEdge.x + endEdge.x) / 2.0f,
-                                1.0 * (startEdge.y + endEdge.y) / 2.0f};
+            Vector2 midPoint = {1.0 * (startspedge.x + endspedge.x) / 2.0f,
+                                1.0 * (startspedge.y + endspedge.y) / 2.0f};
 
-            // Tính vector nối từ node u đến node v
-            Vector2 delta = {endEdge.x - startEdge.x,
-                             endEdge.y - startEdge.y};
+            // Tính vector nối từ spnode u đến spnode v
+            Vector2 delta = {endspedge.x - startspedge.x,
+                             endspedge.y - startspedge.y};
             float dist = sqrtf(1.0 * delta.x * delta.x + 1.0 * delta.y * delta.y);
-            if (dist < 0.1f)
-                dist = 0.1f; // tránh chia cho 0
+            if (dist < 0.01f)
+                dist = 0.01f; // tránh chia cho 0
 
             // Tính vector pháp tuyến (normalized)
             Vector2 normal = {-delta.y / dist, delta.x / dist};
 
             // Chọn offset (khoảng cách dịch chuyển từ trung điểm)
-            float offset = 13.0f; // bạn có thể điều chỉnh giá trị này
+            float offset = GetFont().baseSize * 0.75 - 5; // bạn có thể điều chỉnh giá trị này
             Vector2 labelPos = {midPoint.x + normal.x * offset, midPoint.y + normal.y * offset};
 
             // Hiển thị trọng số tại vị trí labelPos
-            std::string weightStr = std::to_string(static_cast<int>(edge.weight));
-            DrawText(weightStr.c_str(), (labelPos.x), (labelPos.y), 17, BLACK);
+            std::string weightStr = std::to_string(static_cast<int>(spedge.weight));
+            int tw = MeasureText(weightStr.c_str(), GetFont().baseSize);
+            // DrawText(weightStr.c_str(), (labelPos.x) - tw / 2, (labelPos.y) - 10, 20, BLACK);
+            DrawTextEx(GetFont(), weightStr.c_str(), {labelPos.x - float(1.0 * tw / 2.0), labelPos.y - float(1.0 * GetFont().baseSize / 2.0)}, GetFont().baseSize, 1, BLACK);
         }
     }
 
-    for (int i = 0; i < nodes.size(); i++)
+    for (int i = 0; i < int(spnodes.size()); i++)
     {
-        Color color = (i == selectedNode) ? BLUE : nodes[i].color;
+        Color color = (i == selectedspnode) ? BLUE : spnodes[i].color;
         for (double thickness = 0.0; thickness < 3.0; thickness += 0.5)
-            DrawCircleLinesV(nodes[i].position, 20.0f + thickness, color);
+            DrawCircleLinesV(spnodes[i].position, 20.0f + thickness, color);
         std::string text = std::to_string(i);
-        int valueTextWidth = MeasureText(text.c_str(), 20.0f);
-        DrawText(text.c_str(), nodes[i].position.x - valueTextWidth / 2, nodes[i].position.y - 10, 20, BLUE);
-        DrawCenteredText(nodes[i].text, {nodes[i].position.x, nodes[i].position.y + 23}, 20, RED);
+        int valueTextWidth = MeasureText(text.c_str(), GetFont().baseSize);
+        // DrawText(text.c_str(), spnodes[i].position.x - valueTextWidth / 2, spnodes[i].position.y - 10, 20, BLUE);
+        DrawTextEx(GetFont(), text.c_str(), {spnodes[i].position.x - float(1.0 * valueTextWidth / 2.0), spnodes[i].position.y - float(1.0 * GetFont().baseSize / 2.0)}, GetFont().baseSize, 1, color);
+        DrawCenteredText(spnodes[i].text, {spnodes[i].position.x, spnodes[i].position.y + 23}, GetFont().baseSize, RED);
     }
 }
 void rendershortestpath(int screenWidth, int screenHeight)
 {
-    static float nodeRadius = 20.0f;
+    static float spnodeRadius = 20.0f;
     static int frameCount = 0;
     // ---- THÔNG SỐ ĐÃ ĐIỀU CHỈNH ----
-    static float C_rep = 700000.0f; // Lực đẩy (càng lớn, các node càng đẩy mạnh hơn)
-    static float c_spring = 15.0f;  // Lực hút (càng lớn, các node càng hút mạnh hơn)
-    static float L = 150.0f;        // Độ dài lò xo lý tưởng
+    static float C_rep = 1000000.0f; // Lực đẩy (càng lớn, các spnode càng đẩy mạnh hơn)
+    static float c_spring = 10.0f;   // Lực hút (càng lớn, các spnode càng hút mạnh hơn)
+    static float L = 225.0f;         // Độ dài lò xo lý tưởng
 
     static float timeStep = 0.05f;    // Bước thời gian
-    static float damping = 0.75f;     // Giảm damping để node di chuyển linh hoạt hơn
+    static float damping = 0.7f;      // Giảm damping để spnode di chuyển linh hoạt hơn
     static int physicsIterations = 5; // Số lần cập nhật vật lý mỗi khung hình
 
-    static std::vector<Node> nodes;
-    static std::vector<Edge> edges;
-    static int selectedNode = -1;
+    static std::vector<spnode> spnodes;
+    static std::vector<spedge> spedges;
+    static int selectedspnode = -1;
     static Rectangle dijkstra_box = {1200, 200, 200, 50};
     static bool dijkstraActive = false;
     static char dijkstraBuffer[MAX_INPUT_CHARS + 1] = {0}; // Buffer
     static int dijkstraIndex = 0;                          // Index for input buffer
     if (!frameCount)
-        InitializeGraph(nodes, edges, screenWidth, screenHeight);
+        InitializeGraph(spnodes, spedges, screenWidth, screenHeight);
     DrawBoxes_graph(dijkstra_box, dijkstraBuffer, frameCount, dijkstraActive);
     HandleInput_graph(dijkstra_box, dijkstraBuffer, dijkstraIndex, dijkstraActive);
     if (IsKeyPressed(KEY_ENTER))
     {
-        resetcolor(nodes);
-        int startNode = std::stoi(dijkstraBuffer); // Convert string to integer
-        if (startNode >= 0 && startNode < nodes.size())
+        resetcolor(spnodes);
+        int startspnode = std::stoi(dijkstraBuffer); // Convert string to integer
+        if (startspnode >= 0 && startspnode < int(spnodes.size()))
         {
-            resetcolor(nodes);
-            Dijkstra(startNode, nodes, edges);
+            resetcolor(spnodes);
+            Dijkstra(startspnode, spnodes, spedges);
         }
         else
         {
-            std::cout << "Invalid node index!" << std::endl;
+            std::cout << "Invalid spnode index!" << std::endl;
         }
         dijkstraIndex = 0;
         dijkstraBuffer[0] = '\0'; // Reset the buffer
     }
-    UpdateGraph(nodes, edges, selectedNode, C_rep, c_spring, L, timeStep, damping, physicsIterations, nodeRadius, screenWidth, screenHeight);
+    UpdateGraph(spnodes, spedges, selectedspnode, C_rep, c_spring, L, timeStep, damping, physicsIterations, spnodeRadius, screenWidth, screenHeight);
     BeginDrawing();
     ClearBackground(RAYWHITE);
-    RenderGraph(nodes, edges, selectedNode, nodeRadius);
+    RenderGraph(spnodes, spedges, selectedspnode, spnodeRadius);
     EndDrawing();
     frameCount++;
     return;
@@ -380,12 +423,13 @@ void rendershortestpath(int screenWidth, int screenHeight)
 void DrawBoxes_graph(Rectangle Box, const char *Buffer, int framesCounter, bool isActive)
 {
     DrawRectangleRec(Box, LIGHTGRAY);
-    DrawText(Buffer, Box.x + 10, Box.y + 15, 20, BLACK);
+    // DrawText(Buffer, Box.x + 10, Box.y + 15, 20, BLACK);
+    DrawTextEx(GetFont(), Buffer, {Box.x + GetFont().baseSize / 2, Box.y + 15}, GetFont().baseSize, 1, BLACK);
     int MAX_INPUT_CHARS = 10;
     if (((framesCounter / 20) % 2) == 0)
     {
         if (isActive && strlen(Buffer) < MAX_INPUT_CHARS)
-            DrawText("_", Box.x + 10 + MeasureText(Buffer, 20), Box.y + 15, 20, BLACK);
+            DrawText("_", Box.x + GetFont().baseSize / 2 + MeasureText(Buffer, GetFont().baseSize), Box.y + 15, GetFont().baseSize, BLACK);
     }
 }
 
@@ -455,6 +499,7 @@ bool CheckButton_graph(Rectangle button, const char *text)
         DrawRectangleRec(button, GRAY);
     }
 
-    DrawText(text, button.x + 10, button.y + 10, 20, BLACK);
+    // DrawText(text, button.x + 10, button.y + 10, 20, BLACK);
+    DrawTextEx(GetFont(), text, {button.x + GetFont().baseSize / 2, button.y + GetFont().baseSize / 2}, GetFont().baseSize, 1, BLACK);
     return false;
 }
