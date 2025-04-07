@@ -14,7 +14,14 @@ struct spnode
     string text;
     spnode() : position({0, 0}), color(BLACK), velocity({0, 0}), text("INF") {}
 };
-
+struct DrawAction
+{
+    std::string type; // Loại thao tác: "node", "edge", "text", etc.
+    int u, v;         // Các chỉ số liên quan (nút hoặc cạnh)
+    Color color;
+    std::string value; // Màu sắc
+    std::string text;  // Văn bản (nếu có)
+};
 struct spedge
 {
     int start;
@@ -33,4 +40,5 @@ void DrawBoxes_graph(Rectangle Box, const char *Buffer, int framesCounter, bool 
 void HandleInput_graph(Rectangle box, char *buffer, int &index, bool &isActive);
 void drawArrowLine_graph(Vector2 start, Vector2 end, float thickness, Color color);
 void DrawCenteredText(const std::string &text, Vector2 position, int fontSize, Color color);
+bool CheckButton_graph(Rectangle button, const char *text);
 #endif // SHORTEST_PATH_H

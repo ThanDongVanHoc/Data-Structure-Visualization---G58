@@ -9,6 +9,7 @@ const int MAX_INPUT_CHARS = 10;
 std::vector<std::vector<spedge>> adj;
 vector<vector<Color>> color_spedge;
 typedef pair<int, int> ii;
+
 void drawArrowLine_graph(Vector2 start, Vector2 end, float thickness, Color color)
 {
     // Vẽ đường thẳng nối hai điểm
@@ -38,10 +39,8 @@ void drawArrowLine_graph(Vector2 start, Vector2 end, float thickness, Color colo
     DrawTriangle(arrowTip, arrowRight, arrowLeft, color);
 }
 
-void animationedge(int u, int v, const std::vector<spnode> &spnodes, std::vector<spedge> &spedges, Color color)
+void animationedge(int u, int v, const std::vector<spnode> &spnodes, std::vector<spedge> &spedges, Color color, int currentstep)
 {
-    float spedgeLength = EuclideanDistance(spnodes[u].position, spnodes[v].position);
-    // cout << spedgeLength << endl;
 
     Vector2 parentCenter = {spnodes[u].position.x, spnodes[u].position.y};
     Vector2 childCenter = {spnodes[v].position.x, spnodes[v].position.y};
@@ -54,22 +53,16 @@ void animationedge(int u, int v, const std::vector<spnode> &spnodes, std::vector
         direction.x /= len;
         direction.y /= len;
     }
-    int spnodeRadius = 20;
+    float spnodeRadius = 20.0f;
     // Tính điểm bắt đầu và kết thúc: cách tâm một khoảng bằng bán kính
     Vector2 startspedge = {parentCenter.x + direction.x * spnodeRadius, parentCenter.y + direction.y * spnodeRadius};
     Vector2 endspedge = {childCenter.x - direction.x * spnodeRadius, childCenter.y - direction.y * spnodeRadius};
     int thickness = 4.0f;
-    for (float step = 0.1; step <= 1.0; step += 0.015f)
-    {
-        Vector2 direct = {startspedge.x + double((endspedge.x - startspedge.x) * step), startspedge.y + double((endspedge.y - startspedge.y) * step)};
-        float spnodeRadius = 20.0f;
-        int selectedspnode = -1;
-        RenderGraph(spnodes, spedges, selectedspnode, spnodeRadius);
-        DrawLineEx(startspedge, direct, thickness, color);
-        EndDrawing();
-        BeginDrawing();
-        ClearBackground(RAYWHITE);
-    }
+    float step = 0.1f + 0.015f * currentstep;
+    Vector2 direct = {startspedge.x + double((endspedge.x - startspedge.x) * step), startspedge.y + double((endspedge.y - startspedge.y) * step)};
+    int selectedspnode = -1;
+    DrawLineEx(startspedge, direct, thickness, color);
+    // EndDrawing();
     return;
 }
 void animate(std::vector<spnode> &spnodes, std::vector<spedge> &spedges)
@@ -80,9 +73,9 @@ void animate(std::vector<spnode> &spnodes, std::vector<spedge> &spedges)
     EndDrawing();
     BeginDrawing();
     std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Delay for animation
-    ClearBackground(RAYWHITE);
+    // ClearBackground(RAYWHITE);
 }
-void Dijkstra(int start, vector<spnode> &spnodes, std::vector<spedge> &spedges)
+void Dijkstra(int start, vector<spnode> &spnodes, std::vector<spedge> &spedges, std::vector<DrawAction> &drawActions)
 {
     std::vector<int> previous;
     std::vector<float> distances;
@@ -105,7 +98,9 @@ void Dijkstra(int start, vector<spnode> &spnodes, std::vector<spedge> &spedges)
         if (currentDist > distances[u])
             continue;
         spnodes[u].color = RED;
-        animate(spnodes, spedges);
+        drawActions.push_back({"nodes", u, -1, spnodes[u].color, spnodes[u].text, "source"});
+        // animate(spnodes, spedges);
+        // drawActions.push_back({"graph", -1, -1, RAYWHITE, "", ""});
         for (const auto &spedge : adj[u])
         {
             int v = spedge.end;
@@ -114,33 +109,76 @@ void Dijkstra(int start, vector<spnode> &spnodes, std::vector<spedge> &spedges)
             int weight = spedge.weight;
             if (distances[u] + weight < distances[v])
             {
-                animationedge(u, v, spnodes, spedges, ORANGE);
+                // animationedge(u, v, spnodes, spedges, YELLOW);
+                for (int step = 0; step <= 60; step++)
+                {
+                    string text = std::to_string(int(step));
+                    drawActions.push_back({"edges", u, v, YELLOW, "", text});
+                }
                 color_spedge[u][v] = ORANGE;
                 color_spedge[v][u] = ORANGE;
+                drawActions.push_back({"coloredges", u, v, ORANGE, "", ""});
                 spnodes[v].text = std::to_string(int(distances[u] + weight));
+                drawActions.push_back({"nodes", v, -1, spnodes[v].color, spnodes[v].text, ""});
                 if (previous[v] != -1)
                 {
-                    animationedge(previous[v], v, spnodes, spedges, GRAY);
                     color_spedge[previous[v]][v] = GRAY;
                     color_spedge[v][previous[v]] = GRAY;
+                    drawActions.push_back({"coloredges", previous[v], v, GRAY, "", ""});
                 }
-                animate(spnodes, spedges);
+                spnodes[v].color = ORANGE;
+                drawActions.push_back({"nodes", v, -1, spnodes[v].color, spnodes[v].text, ""});
+                // animate(spnodes, spedges);
+                // drawActions.push_back({"graph", -1, -1, RAYWHITE, "", ""});
                 distances[v] = distances[u] + weight;
                 previous[v] = u;
                 pq.push({distances[v], v});
             }
             else if (distances[u] + weight > distances[v])
             {
-                animationedge(u, v, spnodes, spedges, GRAY);
+                // animationedge(u, v, spnodes, spedges, YELLOW);
+                for (int step = 0; step <= 60; step++)
+                {
+                    string text = std::to_string(int(step));
+                    drawActions.push_back({"edges", u, v, YELLOW, "", text});
+                }
                 color_spedge[u][v] = GRAY;
                 color_spedge[v][u] = GRAY;
-                animate(spnodes, spedges);
+                drawActions.push_back({"coloredges", u, v, GRAY, "", ""});
+                // animate(spnodes, spedges);
+                // drawActions.push_back({"graph", -1, -1, RAYWHITE, "", ""});
             }
+        }
+    }
+    for (int u = 0; u < int(spnodes.size()); u++)
+    {
+        if (distances[u] == INF)
+        {
+            for (auto &spedge : adj[u])
+            {
+                int v = spedge.end;
+                if (v == u)
+                    v = spedge.start;
+                // animationedge(u, v, spnodes, spedges, YELLOW);
+                for (int step = 0; step <= 60; step++)
+                {
+                    string text = std::to_string(int(step));
+                    drawActions.push_back({"edges", u, v, YELLOW, "", text});
+                }
+                color_spedge[spedge.start][spedge.end] = GRAY;
+                color_spedge[spedge.end][spedge.start] = GRAY;
+                drawActions.push_back({"coloredges", spedge.start, spedge.end, GRAY, "", ""});
+                // animate(spnodes, spedges);
+                // drawActions.push_back({"graph", -1, -1, RAYWHITE, "", ""});
+            }
+            spnodes[u].color = RED;
+            drawActions.push_back({"nodes", u, -1, spnodes[u].color, spnodes[u].text, ""});
         }
     }
 }
 void resetcolor(std::vector<spnode> &spnodes)
 {
+
     for (int i = 0; i < int(spnodes.size()); i++)
     {
         spnodes[i].color = BLACK;
@@ -356,7 +394,7 @@ void RenderGraph(const std::vector<spnode> &spnodes, const std::vector<spedge> &
             std::string weightStr = std::to_string(static_cast<int>(spedge.weight));
             int tw = MeasureText(weightStr.c_str(), GetFont().baseSize);
             // DrawText(weightStr.c_str(), (labelPos.x) - tw / 2, (labelPos.y) - 10, 20, BLACK);
-            DrawTextEx(GetFont(), weightStr.c_str(), {labelPos.x - float(1.0 * tw / 2.0), labelPos.y - float(1.0 * GetFont().baseSize / 2.0)}, GetFont().baseSize, 1, BLACK);
+            DrawTextEx(GetFont(), weightStr.c_str(), {labelPos.x - float(1.0 * tw / 2.0), labelPos.y - float(1.0 * GetFont().baseSize / 2.0)}, GetFont().baseSize, 1, color_spedge[spedge.start][spedge.end]);
         }
     }
 
@@ -374,6 +412,8 @@ void RenderGraph(const std::vector<spnode> &spnodes, const std::vector<spedge> &
 }
 void rendershortestpath(int screenWidth, int screenHeight)
 {
+    BeginDrawing();
+    ClearBackground(RAYWHITE);
     static float spnodeRadius = 20.0f;
     static int frameCount = 0;
     // ---- THÔNG SỐ ĐÃ ĐIỀU CHỈNH ----
@@ -384,38 +424,87 @@ void rendershortestpath(int screenWidth, int screenHeight)
     static float timeStep = 0.05f;    // Bước thời gian
     static float damping = 0.7f;      // Giảm damping để spnode di chuyển linh hoạt hơn
     static int physicsIterations = 5; // Số lần cập nhật vật lý mỗi khung hình
-
     static std::vector<spnode> spnodes;
     static std::vector<spedge> spedges;
     static int selectedspnode = -1;
     static Rectangle dijkstra_box = {1200, 200, 200, 50};
     static bool dijkstraActive = false;
     static char dijkstraBuffer[MAX_INPUT_CHARS + 1] = {0}; // Buffer
-    static int dijkstraIndex = 0;                          // Index for input buffer
+    static int dijkstraIndex = 0;
+    static std::vector<DrawAction> drawActions; // Index for input buffer
+    static int stepdraw = 0;
+    static bool pause = false;
+    static int currentstep = 0;
+    static Rectangle pause_box = {1200, 300, 200, 50};
     if (!frameCount)
         InitializeGraph(spnodes, spedges, screenWidth, screenHeight);
     DrawBoxes_graph(dijkstra_box, dijkstraBuffer, frameCount, dijkstraActive);
     HandleInput_graph(dijkstra_box, dijkstraBuffer, dijkstraIndex, dijkstraActive);
+    if (CheckButton_graph(pause_box, "Pause"))
+    {
+        pause = !pause;
+    }
     if (IsKeyPressed(KEY_ENTER))
     {
-        resetcolor(spnodes);
-        int startspnode = std::stoi(dijkstraBuffer); // Convert string to integer
-        if (startspnode >= 0 && startspnode < int(spnodes.size()))
+        cout << "Enter pressed" << endl;
+        if (dijkstraBuffer[0] != '\0')
         {
-            resetcolor(spnodes);
-            Dijkstra(startspnode, spnodes, spedges);
+            int startspnode = std::stoi(dijkstraBuffer); // Convert string to integer
+            if (startspnode >= 0 && startspnode < int(spnodes.size()))
+            {
+                drawActions.clear();
+                resetcolor(spnodes);
+                Dijkstra(startspnode, spnodes, spedges, drawActions);
+                resetcolor(spnodes);
+                stepdraw = 0;
+            }
+            else
+            {
+                std::cout << "Invalid spnode index!" << std::endl;
+            }
+            dijkstraIndex = 0;
+            dijkstraBuffer[0] = '\0'; // Reset the buffer
         }
-        else
-        {
-            std::cout << "Invalid spnode index!" << std::endl;
-        }
-        dijkstraIndex = 0;
-        dijkstraBuffer[0] = '\0'; // Reset the buffer
     }
     UpdateGraph(spnodes, spedges, selectedspnode, C_rep, c_spring, L, timeStep, damping, physicsIterations, spnodeRadius, screenWidth, screenHeight);
-    BeginDrawing();
-    ClearBackground(RAYWHITE);
     RenderGraph(spnodes, spedges, selectedspnode, spnodeRadius);
+    if (!drawActions.empty() && stepdraw < drawActions.size() && !pause)
+    {
+        DrawAction drawAction = drawActions[stepdraw];
+        switch (drawAction.type[0]) // Use the first character of the type string for switch
+        {
+        case 'n': // "nodes"
+            spnodes[drawAction.u].color = drawAction.color;
+            spnodes[drawAction.u].text = drawAction.value;
+            break;
+        case 'e': // "edges"
+            currentstep = stoi(drawAction.text);
+            animationedge(drawAction.u, drawAction.v, spnodes, spedges, drawAction.color, currentstep);
+            break;
+        case 'c': // "coloredges"
+            color_spedge[drawAction.u][drawAction.v] = drawAction.color;
+            color_spedge[drawAction.v][drawAction.u] = drawAction.color;
+            break;
+        default:
+            break;
+        }
+        stepdraw++;
+        // frameCount++;
+        // cout << stepdraw << endl;
+    }
+    if (pause)
+    {
+        DrawTextEx(GetFont(), "Pause", {1200, 400}, GetFont().baseSize, 1, BLACK);
+        if (!drawActions.empty() && stepdraw < drawActions.size())
+        {
+            DrawAction drawAction = drawActions[stepdraw];
+            if (drawAction.type[0] == 'e')
+            {
+                currentstep = stoi(drawAction.text);
+                animationedge(drawAction.u, drawAction.v, spnodes, spedges, drawAction.color, currentstep);
+            }
+        }
+    }
     EndDrawing();
     frameCount++;
     return;
