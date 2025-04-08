@@ -436,13 +436,140 @@ void rendershortestpath(int screenWidth, int screenHeight)
     static bool pause = false;
     static int currentstep = 0;
     static Rectangle pause_box = {1200, 300, 200, 50};
+    static Rectangle next_step_box = {1200, 400, 200, 50};
+    static Rectangle prev_step_box = {1200, 500, 200, 50};
+    static Rectangle go_to_begin = {1200, 600, 200, 50};
+    static Rectangle go_to_end = {1200, 700, 200, 50};
+    // Seekbar variables
+    static float sliderValue = 0.0f; // Normalized value (0.0 to 1.0)
+    const int barWidth = 800;
+    const int barHeight = 10;
+    const int barX = 560;
+    const int barY = 920;
+    const int knobRadius = 10;
     if (!frameCount)
         InitializeGraph(spnodes, spedges, screenWidth, screenHeight);
     DrawBoxes_graph(dijkstra_box, dijkstraBuffer, frameCount, dijkstraActive);
     HandleInput_graph(dijkstra_box, dijkstraBuffer, dijkstraIndex, dijkstraActive);
-    if (CheckButton_graph(pause_box, "Pause"))
+    if ((!pause && CheckButton_graph(pause_box, "Pause")) ||
+        (pause && CheckButton_graph(pause_box, "Play")))
     {
+        // Toggle pause state
         pause = !pause;
+    }
+    if (CheckButton_graph(go_to_begin, "Go to begin") && stepdraw > 0)
+    {
+        stepdraw = 0;
+        resetcolor(spnodes);
+    }
+    if (CheckButton_graph(go_to_end, "Go to end") && stepdraw < int(drawActions.size()) - 1)
+    {
+        stepdraw = int(drawActions.size()) - 1;
+        resetcolor(spnodes);
+        for (int i = 0; i <= stepdraw; i++)
+        {
+            DrawAction drawAction = drawActions[i];
+            switch (drawAction.type[0]) // Use the first character of the type string for switch
+            {
+            case 'n': // "nodes"
+                spnodes[drawAction.u].color = drawAction.color;
+                spnodes[drawAction.u].text = drawAction.value;
+                break;
+            case 'c': // "coloredges"
+                color_spedge[drawAction.u][drawAction.v] = drawAction.color;
+                color_spedge[drawAction.v][drawAction.u] = drawAction.color;
+                break;
+            default:
+                break;
+            }
+        }
+    }
+    // Seekbar logic
+    Vector2 mousePoint = GetMousePosition();
+    if (IsMouseButtonDown(MOUSE_LEFT_BUTTON))
+    {
+        if (mousePoint.x >= barX && mousePoint.x <= barX + barWidth &&
+            mousePoint.y >= barY - 10 && mousePoint.y <= barY + barHeight + 10)
+        {
+            sliderValue = (float)(mousePoint.x - barX) / (float)barWidth;
+            stepdraw = (int)(sliderValue * (drawActions.size() - 1));
+            resetcolor(spnodes);
+            for (int i = 0; i <= stepdraw; i++)
+            {
+                DrawAction drawAction = drawActions[i];
+                switch (drawAction.type[0])
+                {
+                case 'n': // "nodes"
+                    spnodes[drawAction.u].color = drawAction.color;
+                    spnodes[drawAction.u].text = drawAction.value;
+                    break;
+                case 'c': // "coloredges"
+                    color_spedge[drawAction.u][drawAction.v] = drawAction.color;
+                    color_spedge[drawAction.v][drawAction.u] = drawAction.color;
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+    }
+    // Draw seekbar
+
+    if (CheckButton_graph(next_step_box, "Next Step") && stepdraw < int(drawActions.size()) - 1 && stepdraw >= 0)
+    {
+        stepdraw++;
+        pause = true;
+        DrawAction drawAction = drawActions[stepdraw];
+        if (drawAction.type[0] == 'e')
+        {
+            int currentstep = stoi(drawAction.text);
+            stepdraw += 60 - currentstep;
+        }
+        stepdraw = min(stepdraw, int(drawActions.size()) - 1);
+        drawAction = drawActions[stepdraw];
+        switch (drawAction.type[0]) // Use the first character of the type string for switch
+        {
+        case 'n': // "nodes"
+            spnodes[drawAction.u].color = drawAction.color;
+            spnodes[drawAction.u].text = drawAction.value;
+            break;
+        case 'c': // "coloredges"
+            color_spedge[drawAction.u][drawAction.v] = drawAction.color;
+            color_spedge[drawAction.v][drawAction.u] = drawAction.color;
+            break;
+        default:
+            break;
+        }
+    }
+    if (CheckButton_graph(prev_step_box, "Previous Step") && stepdraw > 0 && stepdraw < int(drawActions.size()))
+    {
+        stepdraw--;
+        pause = true;
+        resetcolor(spnodes);
+        DrawAction drawAction = drawActions[stepdraw];
+        if (drawAction.type[0] == 'e')
+        {
+            int currentstep = stoi(drawAction.text);
+            stepdraw -= currentstep + 1;
+        }
+        stepdraw = max(0, stepdraw);
+        for (int i = 0; i <= stepdraw; i++)
+        {
+            DrawAction drawAction = drawActions[i];
+            switch (drawAction.type[0])
+            {
+            case 'n': // "nodes"
+                spnodes[drawAction.u].color = drawAction.color;
+                spnodes[drawAction.u].text = drawAction.value;
+                break;
+            case 'c': // "coloredges"
+                color_spedge[drawAction.u][drawAction.v] = drawAction.color;
+                color_spedge[drawAction.v][drawAction.u] = drawAction.color;
+                break;
+            default:
+                break;
+            }
+        }
     }
     if (IsKeyPressed(KEY_ENTER))
     {
@@ -468,7 +595,7 @@ void rendershortestpath(int screenWidth, int screenHeight)
     }
     UpdateGraph(spnodes, spedges, selectedspnode, C_rep, c_spring, L, timeStep, damping, physicsIterations, spnodeRadius, screenWidth, screenHeight);
     RenderGraph(spnodes, spedges, selectedspnode, spnodeRadius);
-    if (!drawActions.empty() && stepdraw < drawActions.size() && !pause)
+    if (!drawActions.empty() && stepdraw < int(drawActions.size()) && !pause && stepdraw >= 0)
     {
         DrawAction drawAction = drawActions[stepdraw];
         switch (drawAction.type[0]) // Use the first character of the type string for switch
@@ -492,10 +619,13 @@ void rendershortestpath(int screenWidth, int screenHeight)
         // frameCount++;
         // cout << stepdraw << endl;
     }
+    sliderValue = (float)stepdraw / (float)(drawActions.size() - 1);
+    DrawRectangle(barX, barY, barWidth, barHeight, LIGHTGRAY);
+    DrawRectangle(barX, barY, (int)(barWidth * sliderValue), barHeight, SKYBLUE);
+    DrawCircle(barX + (int)(sliderValue * barWidth), barY + barHeight / 2, knobRadius, DARKBLUE);
     if (pause)
     {
-        DrawTextEx(GetFont(), "Pause", {1200, 400}, GetFont().baseSize, 1, BLACK);
-        if (!drawActions.empty() && stepdraw < drawActions.size())
+        if (!drawActions.empty() && stepdraw < int(drawActions.size()) && stepdraw >= 0)
         {
             DrawAction drawAction = drawActions[stepdraw];
             if (drawAction.type[0] == 'e')
