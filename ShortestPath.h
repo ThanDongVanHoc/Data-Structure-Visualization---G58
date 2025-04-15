@@ -17,11 +17,12 @@ struct spnode
 };
 struct DrawAction
 {
-    std::string type; // Loại thao tác: "node", "edge", "text", etc.
+    std::string type; // Loại thao tác: "node", "edge", "text", "highlight", etc.
     int u, v;         // Các chỉ số liên quan (nút hoặc cạnh)
     Color color;
-    std::string value; // Màu sắc
+    std::string value; // Giá trị (nếu có)
     std::string text;  // Văn bản (nếu có)
+    int lineNumber;    // Dòng code cần highlight (nếu type là "highlight")
 };
 struct spedge
 {
@@ -48,4 +49,5 @@ void ParseAdjMatrix(const std::vector<std::string> &lines, std::vector<spnode> &
 void ParseEdgeList(const std::vector<std::string> &lines, std::vector<spnode> &spnodes, std::vector<spedge> &spedges, bool &isDirected);
 bool IsValidAdjMatrix(const std::vector<std::string> &lines);
 bool IsValidEdgeList(const std::vector<std::string> &lines);
+void DrawPseudoCode(const std::vector<std::string> &pseudoCode, int highlightedLine);
 #endif // SHORTEST_PATH_H

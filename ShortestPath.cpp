@@ -106,20 +106,29 @@ void Dijkstra(int start, vector<spnode> &spnodes, std::vector<spedge> &spedges, 
     priority_queue<ii, vector<ii>, greater<ii>> pq;
     pq.push({0, start});
     spnodes[start].text = "source,0";
+    for (int i = 0; i <= 20; i++)
+        drawActions.push_back({"highlight", -1, -1, WHITE, "", "", 0}); // Highlight dòng 2
     while (!pq.empty())
     {
+        for (int i = 0; i <= 20; i++)
+            drawActions.push_back({"highlight", -1, -1, WHITE, "", "", 1}); // Highlight dòng 3
         auto k = pq.top();
         int currentDist = k.first;
         int u = k.second;
         pq.pop();
+
         if (currentDist > distances[u])
             continue;
         spnodes[u].color = RED;
-        drawActions.push_back({"nodes", u, -1, spnodes[u].color, spnodes[u].text, "source"});
+        drawActions.push_back({"nodes", u, -1, spnodes[u].color, spnodes[u].text, "source", -1});
+        for (int i = 0; i <= 20; i++)
+            drawActions.push_back({"highlight", -1, -1, WHITE, "", "", 2});
         // animate(spnodes, spedges);
         // drawActions.push_back({"graph", -1, -1, RAYWHITE, "", ""});
         for (const auto &spedge : adj[u])
         {
+            for (int i = 0; i <= 20; i++)
+                drawActions.push_back({"highlight", -1, -1, WHITE, "", "", 3}); // Highlight dòng 6
             int v = spedge.end;
             if (v == u)
                 v = spedge.start;
@@ -128,27 +137,33 @@ void Dijkstra(int start, vector<spnode> &spnodes, std::vector<spedge> &spedges, 
                 continue;
             if (distances[u] + weight < distances[v])
             {
-                // animationedge(u, v, spnodes, spedges, YELLOW);
+                for (int i = 0; i <= 20; i++)
+                    drawActions.push_back({"highlight", -1, -1, WHITE, "", "", 4}); // Highlight dòng 7
+                drawActions.push_back({"highlight", -1, -1, WHITE, "", "", 5});     // Highlight dòng 7
                 for (int step = 0; step <= 120; step++)
                 {
                     string text = std::to_string(int(step));
-                    drawActions.push_back({"edges", u, v, YELLOW, "", text});
+                    drawActions.push_back({"edges", u, v, YELLOW, "", text, -1});
                 }
                 color_spedge[u][v] = ORANGE;
                 color_spedge[v][u] = ORANGE;
-                drawActions.push_back({"coloredges", u, v, ORANGE, "", ""});
+
+                drawActions.push_back({"coloredges", u, v, ORANGE, "", "", -1});
                 spnodes[v].text = std::to_string(int(distances[u] + weight));
-                drawActions.push_back({"nodes", v, -1, spnodes[v].color, spnodes[v].text, ""});
+                drawActions.push_back({"nodes", v, -1, spnodes[v].color, spnodes[v].text, "", -1});
+
                 if (previous[v] != -1)
                 {
                     color_spedge[previous[v]][v] = GRAY;
                     color_spedge[v][previous[v]] = GRAY;
-                    drawActions.push_back({"coloredges", previous[v], v, GRAY, "", ""});
+                    drawActions.push_back({"coloredges", previous[v], v, GRAY, "", "", -1});
                 }
                 spnodes[v].color = ORANGE;
-                drawActions.push_back({"nodes", v, -1, spnodes[v].color, spnodes[v].text, ""});
+                drawActions.push_back({"nodes", v, -1, spnodes[v].color, spnodes[v].text, "", -1});
                 // animate(spnodes, spedges);
                 // drawActions.push_back({"graph", -1, -1, RAYWHITE, "", ""});
+                for (int i = 0; i <= 20; i++)
+                    drawActions.push_back({"highlight", -1, -1, WHITE, "", "", 6});
                 distances[v] = distances[u] + weight;
                 previous[v] = u;
                 pq.push({distances[v], v});
@@ -159,11 +174,11 @@ void Dijkstra(int start, vector<spnode> &spnodes, std::vector<spedge> &spedges, 
                 for (int step = 0; step <= 120; step++)
                 {
                     string text = std::to_string(int(step));
-                    drawActions.push_back({"edges", u, v, YELLOW, "", text});
+                    drawActions.push_back({"edges", u, v, YELLOW, "", text, -1});
                 }
                 color_spedge[u][v] = GRAY;
                 color_spedge[v][u] = GRAY;
-                drawActions.push_back({"coloredges", u, v, GRAY, "", ""});
+                drawActions.push_back({"coloredges", u, v, GRAY, "", "", -1});
                 // animate(spnodes, spedges);
                 // drawActions.push_back({"graph", -1, -1, RAYWHITE, "", ""});
             }
@@ -171,6 +186,7 @@ void Dijkstra(int start, vector<spnode> &spnodes, std::vector<spedge> &spedges, 
     }
     for (int u = 0; u < int(spnodes.size()); u++)
     {
+        drawActions.push_back({"highlight", -1, -1, WHITE, "", "", -1});
         if (distances[u] == INF)
         {
             for (auto &spedge : adj[u])
@@ -182,16 +198,16 @@ void Dijkstra(int start, vector<spnode> &spnodes, std::vector<spedge> &spedges, 
                 for (int step = 0; step <= 120; step++)
                 {
                     string text = std::to_string(int(step));
-                    drawActions.push_back({"edges", u, v, YELLOW, "", text});
+                    drawActions.push_back({"edges", u, v, YELLOW, "", text, -1});
                 }
                 color_spedge[spedge.start][spedge.end] = GRAY;
                 color_spedge[spedge.end][spedge.start] = GRAY;
-                drawActions.push_back({"coloredges", spedge.start, spedge.end, GRAY, "", ""});
+                drawActions.push_back({"coloredges", spedge.start, spedge.end, GRAY, "", "", -1});
                 // animate(spnodes, spedges);
                 // drawActions.push_back({"graph", -1, -1, RAYWHITE, "", ""});
             }
             spnodes[u].color = RED;
-            drawActions.push_back({"nodes", u, -1, spnodes[u].color, spnodes[u].text, ""});
+            drawActions.push_back({"nodes", u, -1, spnodes[u].color, spnodes[u].text, "", -1});
         }
     }
 }
@@ -263,7 +279,7 @@ void GenerateRandomConnectedGraph(std::vector<spnode> &spnodes, std::vector<sped
     srand(static_cast<unsigned>(time(nullptr)));
 
     // Số đỉnh ngẫu nhiên từ 2 đến maxNodes
-    int numNodes = rand() % (maxNodes - 1) + 2;
+    int numNodes = maxNodes;
     spedges.clear();
     spnodes.resize(numNodes);
     color_spedge.clear();
@@ -475,7 +491,7 @@ void DrawCenteredText(const std::string &text, Vector2 position, int fontSize, C
 }
 void RenderGraph(const std::vector<spnode> &spnodes, const std::vector<spedge> &spedges, int selectedspnode, float spnodeRadius, bool isDirected)
 {
-    DrawCenteredText("Dijkstra Visualize", {float(GetScreenWidth() / 2.0f), 100}, GetFont().baseSize * 2, BLACK);
+    DrawCenteredText("SHORTEST PATH", {float(GetScreenWidth() / 2.0f), 50}, GetFont().baseSize * 2, BLACK);
     for (int i = 0; i < int(spnodes.size()); i++)
     {
         for (auto spedge : adj[i])
@@ -562,7 +578,7 @@ void rendershortestpath(int screenWidth, int screenHeight)
     static std::vector<spnode> spnodes;
     static std::vector<spedge> spedges;
     static int selectedspnode = -1;
-    static Rectangle dijkstra_box = {50, 850, 200, 50};
+    static Rectangle dijkstra_box = {300, 850, 100, 50};
     static bool dijkstraActive = false;
     static char dijkstraBuffer[MAX_INPUT_CHARS + 1] = {0}; // Buffer
     static int dijkstraIndex = 0;
@@ -602,6 +618,48 @@ void rendershortestpath(int screenWidth, int screenHeight)
     static bool type_input = false;
     static GuiWindowFileDialogState fileDialogState; // Trạng thái của file dialog
     static bool fileDialogInitialized = false;       // Để kiểm tra xem dialog đã được khởi tạo chưa
+    static bool dijkstra_query = false;
+    static Rectangle randomGraphBox = {300, 800, 100, 50};
+    static bool randomGraphActive = false;
+    static char randomGraphBuffer[MAX_INPUT_CHARS + 1] = {0}; // Buffer for input
+    static int randomGraphIndex = 0;
+    static bool random_query = false;
+
+    static Rectangle pseudoCodeBox = {1880, 600, 40, 300};
+    static bool pseudoCodeActive = false;
+    static std::vector<std::string> pseudoCode = {
+        "1. Initialize distances and priority queue",
+        "2. While priority queue is not empty:",
+        "3.    Extract the node with the smallest distance",
+        "4.    For each neighbor of the node:",
+        "5.        If a shorter path is found:",
+        "6.            Update the distance",
+        "7.            Push the neighbor into the queue"};
+
+    static int highlightedLine = -1;
+    if (CheckButton_graph(pseudoCodeBox, "PSEUDO CODE"))
+    {
+        pseudoCodeActive = !pseudoCodeActive;
+    }
+    if (pseudoCodeActive)
+    {
+        DrawRectangleGradientV(pseudoCodeBox.x, pseudoCodeBox.y, pseudoCodeBox.width, pseudoCodeBox.height, SKYBLUE, DARKBLUE);
+        static Texture2D codetexture = LoadTexture("res/right arrow.png");
+        Texture2D *texture = &codetexture;
+        Rectangle sourceRect = {0, 0, (float)texture->width, (float)texture->height};
+        Rectangle destRect = {1880, 730, 40, 40};
+        DrawTexturePro(*texture, sourceRect, destRect, {0, 0}, 0.0f, WHITE);
+        DrawPseudoCode(pseudoCode, highlightedLine);
+    }
+    else
+    {
+        DrawRectangleGradientV(pseudoCodeBox.x, pseudoCodeBox.y, pseudoCodeBox.width, pseudoCodeBox.height, SKYBLUE, DARKBLUE);
+        static Texture2D codetexture = LoadTexture("res/left arrow.png");
+        Texture2D *texture = &codetexture;
+        Rectangle sourceRect = {0, 0, (float)texture->width, (float)texture->height};
+        Rectangle destRect = {1880, 730, 40, 40};
+        DrawTexturePro(*texture, sourceRect, destRect, {0, 0}, 0.0f, WHITE);
+    }
     if (!fileDialogInitialized)
     {
         fileDialogState = InitGuiWindowFileDialog(GetWorkingDirectory());
@@ -614,7 +672,7 @@ void rendershortestpath(int screenWidth, int screenHeight)
     if (menuActive)
     {
         DrawRectangleGradientV(menu.x, menu.y, menu.width, menu.height, SKYBLUE, DARKBLUE);
-        Texture2D menutexture = LoadTexture("res/left arrow.png");
+        static Texture2D menutexture = LoadTexture("res/left arrow.png");
         Texture2D *texture = &menutexture;
         Rectangle sourceRect = {0, 0, (float)texture->width, (float)texture->height};
         Rectangle destRect = {0, 730, 40, 40};
@@ -684,13 +742,78 @@ void rendershortestpath(int screenWidth, int screenHeight)
         }
         if (CheckButton_graph({50, 750, 200, 50}, "File"))
         {
-            fileDialogState.windowActive = true; // Kích hoạt file dialog
+            fileDialogState.windowActive = !fileDialogState.windowActive; // Kích hoạt file dialog
+        }
+        if (CheckButton_graph({50, 850, 200, 50}, "Dijkstra"))
+        {
+            dijkstra_query = !dijkstra_query;
+        }
+        if (dijkstra_query)
+        {
+            DrawTextEx(GetFont(), "S=", {dijkstra_box.x - 30, dijkstra_box.y + 10}, GetFont().baseSize, 1, BLACK);
+            DrawBoxes_graph(dijkstra_box, dijkstraBuffer, frameCount, dijkstraActive);
+            HandleInput_graph(dijkstra_box, dijkstraBuffer, dijkstraIndex, dijkstraActive);
+            if (IsKeyPressed(KEY_ENTER))
+            {
+                cout << "Enter pressed" << endl;
+                if (dijkstraBuffer[0] != '\0')
+                {
+                    int startspnode = std::stoi(dijkstraBuffer); // Convert string to integer
+                    if (startspnode >= 0 && startspnode < int(spnodes.size()))
+                    {
+                        drawActions.clear();
+                        resetcolor(spnodes);
+                        Dijkstra(startspnode, spnodes, spedges, drawActions);
+                        resetcolor(spnodes);
+                        // dijkstra_total_step = total_step;
+                        stepdraw = 0;
+                    }
+                    else
+                    {
+                        std::cout << "Invalid spnode index!" << std::endl;
+                    }
+                    dijkstraIndex = 0;
+                    dijkstraBuffer[0] = '\0'; // Reset the buffer
+                }
+            }
+        }
+        if (CheckButton_graph({50, 800, 200, 50}, "Random"))
+        {
+            random_query = !random_query;
+        }
+
+        if (random_query)
+        {
+            DrawTextEx(GetFont(), "N=", {randomGraphBox.x - 30, randomGraphBox.y + 10}, GetFont().baseSize, 1, BLACK);
+            DrawBoxes_graph(randomGraphBox, randomGraphBuffer, frameCount, randomGraphActive);
+            HandleInput_graph(randomGraphBox, randomGraphBuffer, randomGraphIndex, randomGraphActive);
+
+            if (IsKeyPressed(KEY_ENTER))
+            {
+                if (randomGraphBuffer[0] != '\0')
+                {
+                    int numNodes = std::stoi(randomGraphBuffer); // Convert input to integer
+                    if (numNodes > 0)
+                    {
+                        GenerateRandomConnectedGraph(spnodes, spedges, numNodes, screenWidth, screenHeight);
+                        drawActions.clear();
+                        resetcolor(spnodes);
+                        stepdraw = 0;
+                    }
+                    else
+                    {
+                        std::cout << "Invalid number of nodes!" << std::endl;
+                    }
+                    randomGraphIndex = 0;
+                    randomGraphBuffer[0] = '\0'; // Reset the buffer
+                }
+            }
         }
     }
     else
     {
         DrawRectangleGradientV(menu.x, menu.y, menu.width, menu.height, SKYBLUE, DARKBLUE);
-        Texture2D menutexture = LoadTexture("res/right arrow.png");
+        static Texture2D menutexture = LoadTexture("res/right arrow.png");
         Texture2D *texture = &menutexture;
         Rectangle sourceRect = {0, 0, (float)texture->width, (float)texture->height};
         Rectangle destRect = {0, 730, 40, 40};
@@ -698,8 +821,7 @@ void rendershortestpath(int screenWidth, int screenHeight)
     }
     if (!frameCount)
         InitializeGraph(spnodes, spedges, screenWidth, screenHeight);
-    DrawBoxes_graph(dijkstra_box, dijkstraBuffer, frameCount, dijkstraActive);
-    HandleInput_graph(dijkstra_box, dijkstraBuffer, dijkstraIndex, dijkstraActive);
+
     if (!(stepdraw < drawActions.size() - 1) && CheckButton_graph(pause_box,
                                                                   "replay"))
     {
@@ -738,6 +860,9 @@ void rendershortestpath(int screenWidth, int screenHeight)
                 color_spedge[drawAction.u][drawAction.v] = drawAction.color;
                 color_spedge[drawAction.v][drawAction.u] = drawAction.color;
                 break;
+            case 'h':
+                highlightedLine = drawAction.lineNumber;
+                break;
             default:
                 break;
             }
@@ -766,6 +891,9 @@ void rendershortestpath(int screenWidth, int screenHeight)
                     color_spedge[drawAction.u][drawAction.v] = drawAction.color;
                     color_spedge[drawAction.v][drawAction.u] = drawAction.color;
                     break;
+                case 'h':
+                    highlightedLine = drawAction.lineNumber;
+                    break;
                 default:
                     break;
                 }
@@ -791,7 +919,6 @@ void rendershortestpath(int screenWidth, int screenHeight)
         {
             int currentstep = stoi(drawAction.text);
             stepdraw += 120 - currentstep;
-            cout << total_step - currentstep << endl;
         }
         stepdraw = min(stepdraw, int(drawActions.size()) - 1);
         drawAction = drawActions[stepdraw];
@@ -804,6 +931,9 @@ void rendershortestpath(int screenWidth, int screenHeight)
         case 'c': // "coloredges"
             color_spedge[drawAction.u][drawAction.v] = drawAction.color;
             color_spedge[drawAction.v][drawAction.u] = drawAction.color;
+            break;
+        case 'h':
+            highlightedLine = drawAction.lineNumber;
             break;
         default:
             break;
@@ -834,39 +964,13 @@ void rendershortestpath(int screenWidth, int screenHeight)
                 color_spedge[drawAction.u][drawAction.v] = drawAction.color;
                 color_spedge[drawAction.v][drawAction.u] = drawAction.color;
                 break;
+            case 'h':
+                highlightedLine = drawAction.lineNumber;
+                break;
             default:
                 break;
             }
         }
-    }
-    if (IsKeyPressed(KEY_ENTER))
-    {
-        cout << "Enter pressed" << endl;
-        if (dijkstraBuffer[0] != '\0')
-        {
-            int startspnode = std::stoi(dijkstraBuffer); // Convert string to integer
-            if (startspnode >= 0 && startspnode < int(spnodes.size()))
-            {
-                drawActions.clear();
-                resetcolor(spnodes);
-                Dijkstra(startspnode, spnodes, spedges, drawActions);
-                resetcolor(spnodes);
-                // dijkstra_total_step = total_step;
-                stepdraw = 0;
-            }
-            else
-            {
-                std::cout << "Invalid spnode index!" << std::endl;
-            }
-            dijkstraIndex = 0;
-            dijkstraBuffer[0] = '\0'; // Reset the buffer
-        }
-    }
-    if (IsKeyPressed(KEY_R)) // Nhấn phím R để tạo đồ thị ngẫu nhiên
-    {
-        stepdraw = 0;
-        drawActions.clear();
-        GenerateRandomConnectedGraph(spnodes, spedges, 20, screenWidth, screenHeight);
     }
     if (!fixed)
         UpdateGraph(spnodes, spedges, selectedspnode, C_rep, c_spring, L, timeStep, damping, physicsIterations, spnodeRadius, screenWidth, screenHeight);
@@ -892,6 +996,9 @@ void rendershortestpath(int screenWidth, int screenHeight)
         case 'c': // "coloredges"
             color_spedge[drawAction.u][drawAction.v] = drawAction.color;
             color_spedge[drawAction.v][drawAction.u] = drawAction.color;
+            break;
+        case 'h':
+            highlightedLine = drawAction.lineNumber;
             break;
         default:
             break;
@@ -1075,6 +1182,10 @@ bool CheckButton_graph(Rectangle button, const char *text)
     else if (std::string(text) == "go to end")
         texture = &endTexture;
     else if (std::string(text) == "menu")
+    {
+        return false;
+    }
+    else if (std::string(text) == "PSEUDO CODE")
     {
         return false;
     }
@@ -1293,5 +1404,20 @@ void ParseAdjMatrix(const std::vector<std::string> &lines, std::vector<spnode> &
                 adj[i].push_back(spedge(i, j, weight));
             }
         }
+    }
+}
+void DrawPseudoCode(const std::vector<std::string> &pseudoCode, int highlightedLine)
+{
+    int startX = 1320;                             // Vị trí bắt đầu vẽ
+    int startY = 600;                              // Vị trí bắt đầu vẽ
+    int lineHeight = GetFont().baseSize + 5;       // Chiều cao mỗi dòng
+    DrawRectangle(1320, 600, 550, 300, LIGHTGRAY); // Vẽ nền cho hộp thoại
+    for (size_t i = 0; i < pseudoCode.size(); i++)
+    {
+        Color color = (i == highlightedLine) ? RED : BLACK; // Highlight dòng hiện tại
+        // DrawText(pseudoCode[i].c_str(), startX, startY + i * lineHeight, 20, color);
+        if (i == highlightedLine)
+            DrawRectangle(startX, startY + i * lineHeight, 550, lineHeight, YELLOW); // Vẽ nền cho dòng
+        DrawTextEx(GetFont(), pseudoCode[i].c_str(), {float(startX), float(startY + i * lineHeight)}, GetFont().baseSize, 1, color);
     }
 }
