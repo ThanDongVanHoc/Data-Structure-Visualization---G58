@@ -6,6 +6,7 @@
 #include <utility> // Để sử dụng std::pair
 #include <bits/stdc++.h>
 using namespace std;
+
 struct spnode
 {
     Vector2 position;
@@ -34,11 +35,17 @@ extern std::vector<std::vector<spedge>> adj; // Declare adj as a vector of vecto
 float EuclideanDistance(Vector2 a, Vector2 b);
 void InitializeGraph(std::vector<spnode> &spnodes, std::vector<spedge> &spedges, int screenWidth, int screenHeight);
 void UpdateGraph(std::vector<spnode> &spnodes, std::vector<spedge> &spedges, int &selectedspnode, float C_rep, float c_spring, float L, float timeStep, float damping, int physicsIterations, float spnodeRadius, int screenWidth, int screenHeight);
-void RenderGraph(const std::vector<spnode> &spnodes, const std::vector<spedge> &spedges, int selectedspnode, float spnodeRadius);
+void RenderGraph(const std::vector<spnode> &spnodes, const std::vector<spedge> &spedges, int selectedspnode, float spnodeRadius, bool isDirected);
 void rendershortestpath(int screenWidth, int screenHeight);
 void DrawBoxes_graph(Rectangle Box, const char *Buffer, int framesCounter, bool isActive);
 void HandleInput_graph(Rectangle box, char *buffer, int &index, bool &isActive);
 void drawArrowLine_graph(Vector2 start, Vector2 end, float thickness, Color color);
 void DrawCenteredText(const std::string &text, Vector2 position, int fontSize, Color color);
 bool CheckButton_graph(Rectangle button, const char *text);
+void GenerateRandomConnectedGraph(std::vector<spnode> &spnodes, std::vector<spedge> &spedges, int maxNodes, int screenWidth, int screenHeight);
+void HandleInputGraphUI(Rectangle inputGraphBox, bool &inputGraphActive, std::vector<spnode> &spnodes, std::vector<spedge> &spedges, int screenWidth, int screenHeight);
+void ParseAdjMatrix(const std::vector<std::string> &lines, std::vector<spnode> &spnodes, std::vector<spedge> &spedges);
+void ParseEdgeList(const std::vector<std::string> &lines, std::vector<spnode> &spnodes, std::vector<spedge> &spedges, bool &isDirected);
+bool IsValidAdjMatrix(const std::vector<std::string> &lines);
+bool IsValidEdgeList(const std::vector<std::string> &lines);
 #endif // SHORTEST_PATH_H

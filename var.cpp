@@ -1,6 +1,7 @@
 #include "var.h"
 
 static Font myfont; // Biến toàn cục để lưu font
+#define FOR(i, a, b) for (int i = (a), _b = (b); i <= _b; i++)
 
 void LoadFonts()
 {
