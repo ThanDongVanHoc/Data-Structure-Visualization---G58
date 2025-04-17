@@ -1,24 +1,20 @@
 // renderer.cpp
-#include <bits/stdc++.h>
 #include "raylib.h"
+#include "raygui.h"
+#include "gui_window_file_dialog.h"
+#include <bits/stdc++.h>
 #include <chrono>
 #include <thread>
 #include <string>
 #include <fstream>
 #include "var.h"
 #include "hashtable.h"
+#include <random> // Thêm thư viện random
 const int MAX_INPUT_CHARS = 10;
 
 int nodeRadius = 20;
 using namespace std;
 
-enum HashingMode
-{
-    LINEAR,
-    QUADRATIC,
-    DOUBLE_HASHING,
-    CHAINING
-};
 void resetcolor(std::vector<HashNode> &hashTable)
 {
     for (size_t i = 0; i < hashTable.size(); ++i)
@@ -64,92 +60,175 @@ void drawArrowLine_hash(Vector2 start, Vector2 end, float thickness, Color color
 // Hàm băm phụ cho Double Hashing
 int Hash2(int key, int tableSize)
 {
-    int prime = tableSize - 1; // Một số nguyên tố nhỏ hơn kích thước bảng
-    return prime - (key % prime);
+    int prime = tableSize - 1;
+    while (prime > 1)
+    {
+        bool isPrime = true;
+        for (int i = 2; i * i <= prime; ++i)
+        {
+            if (prime % i == 0)
+            {
+                isPrime = false;
+                break;
+            }
+        }
+        if (isPrime)
+        {
+            break;
+        }
+        --prime;
+    }
+    return max(1, prime - (key % prime));
 }
-void inputHashTable(std::vector<HashNode> &hashTable, vector<vector<HashNode>> &history, int key, int value, HashingMode mode)
+void inputHashTable(std::vector<HashNode> &hashTable, std::vector<HashTableState> &history, int key, int value, HashingMode mode)
 {
     int hashIndex = key % hashTable.size();
+    int highlightedLine = 1; // Dòng đầu tiên của pseudocode
+    for (int j = 0; j <= 20; j++)
+        history.push_back({hashTable, "Insert", highlightedLine});
+
     if (mode == CHAINING)
     {
         hashTable[hashIndex].color = YELLOW;
+        highlightedLine = 3; // Highlight dòng "index = key % size_of(hashTable)"
         for (int j = 0; j <= 20; j++)
-            history.push_back(CopyHashTable(hashTable));
+            history.push_back({hashTable, "Insert", highlightedLine});
+
         HashNode *newNode = new HashNode();
         newNode->value = value;
         newNode->isEmpty = false;
         newNode->color = YELLOW;
         newNode->next = nullptr;
 
-        // Thêm vào tail của danh sách liên kết
         if (hashTable[hashIndex].next == nullptr)
         {
-            // Nếu danh sách liên kết rỗng, thêm nút mới làm nút đầu tiên
             hashTable[hashIndex].next = newNode;
+            highlightedLine = 4; // Highlight dòng "hashTable[index].append(value)"
             for (int j = 0; j <= 20; j++)
-                history.push_back(CopyHashTable(hashTable));
+                history.push_back({hashTable, "Insert", highlightedLine});
         }
         else
         {
-            // Duyệt đến cuối danh sách liên kết
             HashNode *current = hashTable[hashIndex].next;
             while (current->next != nullptr)
             {
-                current->color = YELLOW;
-                for (int j = 0; j <= 20; j++)
-                    history.push_back(CopyHashTable(hashTable));
                 current = current->next;
             }
-            current->color = YELLOW;
+            current->next = newNode;
+            highlightedLine = 5; // Highlight dòng "hashTable[index].append(value)"
             for (int j = 0; j <= 20; j++)
-                history.push_back(CopyHashTable(hashTable));
-            current->next = newNode; // Thêm nút mới vào cuối danh sách
+                history.push_back({hashTable, "Insert", highlightedLine});
         }
-
-        // Lưu trạng thái bảng băm
-        for (int j = 0; j <= 20; j++)
-            history.push_back(CopyHashTable(hashTable));
         return;
     }
 
-    // Các chế độ khác (LINEAR, QUADRATIC, DOUBLE_HASHING)
     int i = 0;
     while (!hashTable[hashIndex].isEmpty)
     {
         hashTable[hashIndex].color = YELLOW;
+        switch (mode)
+        {
+        case LINEAR:
+            highlightedLine = 3; // Highlight dòng "while hashTable[index] is not empty:"
+            break;
+        case QUADRATIC:
+            highlightedLine = 4; // Highlight dòng "while hashTable[index] is not empty:"
+            break;
+        case DOUBLE_HASHING:
+            highlightedLine = 4; // Highlight dòng "while hashTable[index] is not empty:"
+            break;
+        default:
+            break;
+        }
         for (int j = 0; j <= 20; j++)
-            history.push_back(CopyHashTable(hashTable));
+            history.push_back({hashTable, "Insert", highlightedLine});
+
         if (mode == LINEAR)
             hashIndex = (hashIndex + 1) % hashTable.size();
         else if (mode == QUADRATIC)
             hashIndex = (hashIndex + (++i) * i) % hashTable.size();
         else if (mode == DOUBLE_HASHING)
             hashIndex = (hashIndex + (++i) * Hash2(key, hashTable.size())) % hashTable.size();
+        switch (mode)
+        {
+        case LINEAR:
+            highlightedLine = 4; // Highlight dòng "while hashTable[index] is not empty:"
+            break;
+        case QUADRATIC:
+            highlightedLine = 6; // Highlight dòng "while hashTable[index] is not empty:"
+            break;
+        case DOUBLE_HASHING:
+            highlightedLine = 5; // Highlight dòng "while hashTable[index] is not empty:"
+            break;
+        default:
+            break;
+        }
+        for (int j = 0; j <= 20; j++)
+            history.push_back({hashTable, "Insert", highlightedLine});
     }
+
     hashTable[hashIndex].value = value;
     hashTable[hashIndex].isEmpty = false;
     hashTable[hashIndex].color = YELLOW;
+    switch (mode)
+    {
+    case LINEAR:
+        highlightedLine = 5; // Highlight dòng "while hashTable[index] is not empty:"
+        break;
+    case QUADRATIC:
+        highlightedLine = 7; // Highlight dòng "while hashTable[index] is not empty:"
+        break;
+    case DOUBLE_HASHING:
+        highlightedLine = 6; // Highlight dòng "while hashTable[index] is not empty:"
+        break;
+    default:
+        break;
+    }
     for (int j = 0; j <= 20; j++)
-        history.push_back(CopyHashTable(hashTable));
+        history.push_back({hashTable, "Insert", highlightedLine});
 }
-bool searchHashTable(std::vector<HashNode> &hashTable, vector<vector<HashNode>> &history, int key, HashingMode mode, int &foundIndex)
+bool searchHashTable(std::vector<HashNode> &hashTable, std::vector<HashTableState> &history, int key, HashingMode mode, int &foundIndex)
 {
     int hashIndex = key % hashTable.size();
+    int highlightedLine = 1; // Dòng đầu tiên của pseudocode
+    for (int j = 0; j <= 20; j++)
+
+        history.push_back({hashTable, "Search", highlightedLine});
+
     if (mode == CHAINING)
     {
         HashNode *current = hashTable[hashIndex].next;
+
+        highlightedLine = 2; // Highlight dòng "index = key % size_of(hashTable)"
+        for (int j = 0; j <= 20; j++)
+
+            history.push_back({hashTable, "Search", highlightedLine});
+
         while (current != nullptr)
         {
-            current->color = RED;
+            current->color = YELLOW;
+            highlightedLine = 4; // Highlight dòng "for node in hashTable[index]:"
             for (int j = 0; j <= 20; j++)
-                history.push_back(CopyHashTable(hashTable));
+
+                history.push_back({hashTable, "Search", highlightedLine});
+
             if (current->value == key)
             {
                 foundIndex = hashIndex;
+
+                highlightedLine = 6; // Highlight dòng "return index"
+                for (int j = 0; j <= 20; j++)
+
+                    history.push_back({hashTable, "Search", highlightedLine});
                 return true;
             }
             current = current->next;
         }
+
+        highlightedLine = 7; // Highlight dòng "return -1 // Not found"
+        for (int j = 0; j <= 20; j++)
+
+            history.push_back({hashTable, "Search", highlightedLine});
         return false;
     }
 
@@ -157,36 +236,116 @@ bool searchHashTable(std::vector<HashNode> &hashTable, vector<vector<HashNode>> 
     int i = 0;
     while (!hashTable[hashIndex].isEmpty)
     {
-        hashTable[hashIndex].color = RED;
+        hashTable[hashIndex].color = YELLOW;
+        switch (mode)
+        {
+        case LINEAR:
+            highlightedLine = 3; // Highlight dòng "while hashTable[index] is not empty:"
+            break;
+        case QUADRATIC:
+            highlightedLine = 4; // Highlight dòng "while hashTable[index] is not empty:"
+            break;
+        case DOUBLE_HASHING:
+            highlightedLine = 4; // Highlight dòng "while hashTable[index] is not empty:"
+            break;
+        default:
+            break;
+        }
         for (int j = 0; j <= 20; j++)
-            history.push_back(CopyHashTable(hashTable));
+
+            history.push_back({hashTable, "Search", highlightedLine});
+
         if (hashTable[hashIndex].value == key)
         {
             foundIndex = hashIndex;
+
+            switch (mode)
+            {
+            case LINEAR:
+                highlightedLine = 4; // Highlight dòng "while hashTable[index] is not empty:"
+                break;
+            case QUADRATIC:
+                highlightedLine = 5; // Highlight dòng "while hashTable[index] is not empty:"
+                break;
+            case DOUBLE_HASHING:
+                highlightedLine = 5; // Highlight dòng "while hashTable[index] is not empty:"
+                break;
+            default:
+                break;
+            }
+            for (int j = 0; j <= 20; j++)
+
+                history.push_back({hashTable, "Search", highlightedLine});
             return true;
         }
+
         if (mode == LINEAR)
             hashIndex = (hashIndex + 1) % hashTable.size();
         else if (mode == QUADRATIC)
             hashIndex = (hashIndex + (++i) * i) % hashTable.size();
         else if (mode == DOUBLE_HASHING)
             hashIndex = (hashIndex + (++i) * Hash2(key, hashTable.size())) % hashTable.size();
+        switch (mode)
+        {
+        case LINEAR:
+            highlightedLine = 6; // Highlight dòng "while hashTable[index] is not empty:"
+            break;
+        case QUADRATIC:
+            highlightedLine = 8; // Highlight dòng "while hashTable[index] is not empty:"
+            break;
+        case DOUBLE_HASHING:
+            highlightedLine = 7; // Highlight dòng "while hashTable[index] is not empty:"
+            break;
+        default:
+            break;
+        }
+        for (int j = 0; j <= 20; j++)
+
+            history.push_back({hashTable, "Search", highlightedLine});
     }
+
+    switch (mode)
+    {
+    case LINEAR:
+        highlightedLine = 7; // Highlight dòng "while hashTable[index] is not empty:"
+        break;
+    case QUADRATIC:
+        highlightedLine = 9; // Highlight dòng "while hashTable[index] is not empty:"
+        break;
+    case DOUBLE_HASHING:
+        highlightedLine = 8; // Highlight dòng "while hashTable[index] is not empty:"
+        break;
+    default:
+        break;
+    }
+    for (int j = 0; j <= 20; j++)
+
+        history.push_back({hashTable, "Search", highlightedLine});
     return false;
 }
-bool removeHashTable(std::vector<HashNode> &hashTable, vector<vector<HashNode>> &history, int key, HashingMode mode)
+bool removeHashTable(std::vector<HashNode> &hashTable, std::vector<HashTableState> &history, int key, HashingMode mode)
 {
     int hashIndex = key % hashTable.size();
+    int highlightedLine = 1; // Dòng đầu tiên của pseudocode
+    for (int j = 0; j <= 20; j++)
+        history.push_back({hashTable, "Remove", highlightedLine});
+
     if (mode == CHAINING)
     {
         HashNode *current = hashTable[hashIndex].next;
         HashNode *prev = nullptr;
 
+        highlightedLine = 2; // Highlight dòng "index = key % size_of(hashTable)"
+        for (int j = 0; j <= 20; j++)
+            history.push_back({hashTable, "Remove", highlightedLine});
+
         while (current != nullptr)
         {
             current->color = YELLOW;
+            highlightedLine = 3; // Highlight dòng "for node in hashTable[index]:"
             for (int j = 0; j <= 20; j++)
-                history.push_back(CopyHashTable(hashTable));
+                history.push_back({hashTable, "Remove", highlightedLine});
+
             if (current->value == key)
             {
                 if (prev == nullptr)
@@ -198,13 +357,19 @@ bool removeHashTable(std::vector<HashNode> &hashTable, vector<vector<HashNode>> 
                     prev->next = current->next;
                 }
                 delete current;
+
+                highlightedLine = 5; // Highlight dòng "hashTable[index].remove(node)"
                 for (int j = 0; j <= 20; j++)
-                    history.push_back(CopyHashTable(hashTable));
+                    history.push_back({hashTable, "Remove", highlightedLine});
                 return true;
             }
             prev = current;
             current = current->next;
         }
+
+        highlightedLine = 6; // Highlight dòng "return false // Not found"
+        for (int j = 0; j <= 20; j++)
+            history.push_back({hashTable, "Remove", highlightedLine});
         return false;
     }
 
@@ -213,22 +378,87 @@ bool removeHashTable(std::vector<HashNode> &hashTable, vector<vector<HashNode>> 
     while (!hashTable[hashIndex].isEmpty)
     {
         hashTable[hashIndex].color = YELLOW;
+        switch (mode)
+        {
+        case LINEAR:
+            highlightedLine = 3; // Highlight dòng "while hashTable[index] is not empty:"
+            break;
+        case QUADRATIC:
+            highlightedLine = 4; // Highlight dòng "while hashTable[index] is not empty:"
+            break;
+        case DOUBLE_HASHING:
+            highlightedLine = 4; // Highlight dòng "while hashTable[index] is not empty:"
+            break;
+        default:
+            break;
+        }
         for (int j = 0; j <= 20; j++)
-            history.push_back(CopyHashTable(hashTable));
+            history.push_back({hashTable, "Remove", highlightedLine});
+
         if (hashTable[hashIndex].value == key)
         {
             hashTable[hashIndex].isEmpty = true;
+
+            switch (mode)
+            {
+            case LINEAR:
+                highlightedLine = 4; // Highlight dòng "hashTable[index] = empty"
+                break;
+            case QUADRATIC:
+                highlightedLine = 5; // Highlight dòng "hashTable[index] = empty"
+                break;
+            case DOUBLE_HASHING:
+                highlightedLine = 5; // Highlight dòng "hashTable[index] = empty"
+                break;
+            default:
+                break;
+            }
             for (int j = 0; j <= 20; j++)
-                history.push_back(CopyHashTable(hashTable));
+                history.push_back({hashTable, "Remove", highlightedLine});
             return true;
         }
+
         if (mode == LINEAR)
             hashIndex = (hashIndex + 1) % hashTable.size();
         else if (mode == QUADRATIC)
             hashIndex = (hashIndex + (++i) * i) % hashTable.size();
         else if (mode == DOUBLE_HASHING)
             hashIndex = (hashIndex + (++i) * Hash2(key, hashTable.size())) % hashTable.size();
+
+        switch (mode)
+        {
+        case LINEAR:
+            highlightedLine = 5; // Highlight dòng "while hashTable[index] is not empty:"
+            break;
+        case QUADRATIC:
+            highlightedLine = 7; // Highlight dòng "while hashTable[index] is not empty:"
+            break;
+        case DOUBLE_HASHING:
+            highlightedLine = 6; // Highlight dòng "while hashTable[index] is not empty:"
+            break;
+        default:
+            break;
+        }
+        for (int j = 0; j <= 20; j++)
+            history.push_back({hashTable, "Remove", highlightedLine});
     }
+
+    switch (mode)
+    {
+    case LINEAR:
+        highlightedLine = 6; // Highlight dòng "return false // Not found"
+        break;
+    case QUADRATIC:
+        highlightedLine = 8; // Highlight dòng "return false // Not found"
+        break;
+    case DOUBLE_HASHING:
+        highlightedLine = 7; // Highlight dòng "return false // Not found"
+        break;
+    default:
+        break;
+    }
+    for (int j = 0; j <= 20; j++)
+        history.push_back({hashTable, "Remove", highlightedLine});
     return false;
 }
 // Hàm vẽ bảng băm
@@ -457,12 +687,12 @@ void RenderHashTable()
     static HashingMode mode = LINEAR;
     static int framecounter = 0;
     static bool inputActive = false, searchActive = false, removeActive = false, sizeActive = false;
-    static vector<vector<HashNode>> hashTableHistory; // Lưu lịch sử bảng băm
-    static int hashtablestep = 0;                     // Chỉ số lịch sử hiện tại
-    Rectangle inputBox = {300, 600, 200, 50};
-    Rectangle searchBox = {300, 650, 200, 50};
-    Rectangle removeBox = {300, 700, 200, 50};
-    Rectangle sizeBox = {300, 750, 200, 50};
+    static std::vector<HashTableState> hashTableHistory; // Lưu lịch sử bảng băm
+    static int hashtablestep = 0;                        // Chỉ số lịch sử hiện tại
+    Rectangle inputBox = {260, 600, 200, 50};
+    Rectangle searchBox = {260, 650, 200, 50};
+    Rectangle removeBox = {260, 700, 200, 50};
+    Rectangle sizeBox = {260, 750, 200, 50};
     Rectangle linearButton = {50, 80, 215, 50};
     Rectangle quadraticButton = {285, 80, 215, 50};
     Rectangle doubleHashingButton = {520, 80, 215, 50};
@@ -500,11 +730,44 @@ void RenderHashTable()
     static Rectangle removeButton = {50, 700, 200, 50};
     static Rectangle createButton = {50, 750, 200, 50};
     static Rectangle fileButton = {50, 800, 200, 50};
+    static Rectangle RandomButton = {50, 850, 200, 50};
     static bool inputActiveButton = false;
     static bool searchActiveButton = false;
     static bool removeActiveButton = false;
     static bool createActiveButton = false;
     static bool fileActiveButton = false;
+    static bool RandomActiveButton = false;
+    static GuiWindowFileDialogState fileDialogState; // Trạng thái của file dialog
+    static bool fileDialogInitialized = false;       // Để kiểm tra xem dialog đã được khở
+    static Rectangle pseudoCodeBox = {1880, 600, 40, 300};
+    static bool pseudoCodeActive = false;
+    if (CheckButton_hash(pseudoCodeBox, "PSEUDO CODE"))
+    {
+        pseudoCodeActive = !pseudoCodeActive;
+    }
+    if (pseudoCodeActive)
+    {
+        DrawRectangleGradientV(pseudoCodeBox.x, pseudoCodeBox.y, pseudoCodeBox.width, pseudoCodeBox.height, SKYBLUE, DARKBLUE);
+        static Texture2D codetexture = LoadTexture("res/right arrow.png");
+        Texture2D *texture = &codetexture;
+        Rectangle sourceRect = {0, 0, (float)texture->width, (float)texture->height};
+        Rectangle destRect = {1880, 730, 40, 40};
+        DrawTexturePro(*texture, sourceRect, destRect, {0, 0}, 0.0f, WHITE);
+    }
+    else
+    {
+        DrawRectangleGradientV(pseudoCodeBox.x, pseudoCodeBox.y, pseudoCodeBox.width, pseudoCodeBox.height, SKYBLUE, DARKBLUE);
+        static Texture2D codetexture = LoadTexture("res/left arrow.png");
+        Texture2D *texture = &codetexture;
+        Rectangle sourceRect = {0, 0, (float)texture->width, (float)texture->height};
+        Rectangle destRect = {1880, 730, 40, 40};
+        DrawTexturePro(*texture, sourceRect, destRect, {0, 0}, 0.0f, WHITE);
+    }
+    if (!fileDialogInitialized)
+    {
+        fileDialogState = InitGuiWindowFileDialog(GetWorkingDirectory());
+        fileDialogInitialized = true;
+    }
     if (CheckButton_hash(menu, "menu"))
     {
         menuActive = !menuActive;
@@ -629,6 +892,83 @@ void RenderHashTable()
             searchActiveButton = !searchActiveButton;
         if (CheckButton_hash(createButton, "Create"))
             createActiveButton = !createActiveButton;
+        if (CheckButton_hash(fileButton, "File"))
+        {
+            fileDialogState.windowActive = !fileDialogState.windowActive; // Kích hoạt file dialog
+        }
+        if (fileDialogState.windowActive)
+        {
+            GuiWindowFileDialog(&fileDialogState);
+
+            if (fileDialogState.SelectFilePressed)
+            {
+                // Xử lý file được chọn
+                std::string selectedFilePath = std::string(fileDialogState.dirPathText) + "\\" + std::string(fileDialogState.fileNameText);
+                std::cout << "Selected file: " << selectedFilePath << std::endl;
+
+                std::ifstream inputFile(selectedFilePath);
+                if (inputFile.is_open())
+                {
+                    std::string line;
+                    hashTable.clear();                       // Xóa bảng băm hiện tại
+                    hashTable.resize(tableSize, HashNode()); // Tạo bảng băm mới với kích thước đã chỉ định
+
+                    while (std::getline(inputFile, line))
+                    {
+                        std::stringstream ss(line); // Sử dụng stringstream để tách các số trong dòng
+                        int value;
+                        while (ss >> value) // Đọc từng số nguyên từ dòng
+                        {
+                            inputHashTable(hashTable, hashTableHistory, value, value, mode); // Thêm giá trị vào bảng băm
+                        }
+                    }
+                    inputFile.close();
+                    hashTableHistory.clear();    // Xóa lịch sử bảng băm
+                    hashtablestep = 0;           // Đặt lại chỉ số lịch sử
+                    found = false;               // Đặt lại trạng thái tìm kiếm
+                    foundIndex = -1;             // Đặt lại chỉ số tìm kiếm
+                    showNotFoundMessage = false; // Đặt lại thông báo không tìm thấy
+                }
+                else
+                {
+                    std::cerr << "Failed to open file: " << selectedFilePath << std::endl;
+                }
+
+                fileDialogState.SelectFilePressed = false; // Reset trạng thái
+            }
+        }
+        if (CheckButton_hash(RandomButton, "Random"))
+        {
+            hashTable.clear();     // Xóa bảng băm hiện tại
+            resetcolor(hashTable); // Đặt lại màu sắc cho bảng băm
+            hashTableHistory.clear();
+            hashtablestep = 0;
+            found = false;
+            foundIndex = -1;
+            showNotFoundMessage = false;
+
+            // Random kích thước bảng băm mới
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::uniform_int_distribution<> sizeDist(10, (mode != CHAINING) ? 100 : 23); // Kích thước từ 10 đến 100
+            tableSize = sizeDist(gen);
+            hashTable.resize(tableSize, HashNode());
+            std::fill(hashTable.begin(), hashTable.end(), HashNode());
+
+            // Random giá trị để thêm vào bảng băm
+            std::uniform_int_distribution<> valueDist(1, 100);      // Giá trị từ 1 đến 1000
+            int numValues = std::min(sizeDist(gen) / 2, tableSize); // Số lượng giá trị không vượt quá kích thước bảng
+            if (numValues == tableSize)
+                numValues /= 2;
+            cout << tableSize << " " << numValues << endl;
+            for (int i = 0; i < numValues; ++i)
+            {
+                int randomValue = valueDist(gen);
+                inputHashTable(hashTable, hashTableHistory, randomValue, randomValue, mode);
+            }
+            hashTableHistory.clear(); // Xóa lịch sử bảng băm
+            hashtablestep = 0;        // Đặt lại chỉ số lịch sử
+        }
         if (inputActiveButton)
         {
             DrawBoxes_hash(inputBox, inputBuffer, framecounter, inputActive);
@@ -710,10 +1050,6 @@ void RenderHashTable()
             }
         }
     }
-    if (showNotFoundMessage)
-    {
-        DrawText("Value not found", 800, 350, 20, RED);
-    }
     // Hiển thị chế độ hiện tại
     const char *modeText = "";
     switch (mode)
@@ -737,7 +1073,10 @@ void RenderHashTable()
 
     if (hashtablestep >= 0 && hashtablestep < hashTableHistory.size())
     {
-        DrawHashTable(hashTableHistory[hashtablestep], foundIndex, found); // Vẽ bảng băm
+        const auto &currentState = hashTableHistory[hashtablestep];
+        DrawHashTable(currentState.hashTable, foundIndex, found); // Vẽ bảng băm
+        if (pseudoCodeActive)
+            DrawPseudoCode(mode, currentState.operation, currentState.highlightedLine); // Vẽ pseudocode
         if (!pause)
             hashtablestep += animationSpeed; // Tăng chỉ số lịch sử theo tốc độ
     }
@@ -759,5 +1098,167 @@ void DrawBoxes_hash(const Rectangle &Box, const char *Buffer, const int &framesC
     {
         if (isActive && strlen(Buffer) < MAX_INPUT_CHARS)
             DrawText("_", Box.x + GetFont().baseSize / 2 + MeasureText(Buffer, GetFont().baseSize), Box.y + 15, GetFont().baseSize, BLACK);
+    }
+}
+
+void DrawPseudoCode(HashingMode mode, const std::string &operation, int highlightedLine)
+{
+    std::vector<std::string> pseudoCode;
+
+    // Xác định pseudocode dựa trên thao tác và chế độ băm
+    if (operation == "Insert")
+    {
+        if (mode == LINEAR)
+        {
+            pseudoCode = {
+                "Insert_LinearProbing: ",
+                "index = key % size; ",
+                "while not empty: ",
+                "   index = (index + 1) % size; ",
+                "set value"};
+        }
+        else if (mode == QUADRATIC)
+        {
+            pseudoCode = {
+                "Insert_QuadraticProbing: ",
+                "index = key % size; ",
+                "i = 0; ",
+                "while not empty: ",
+                "   i++; ",
+                "   index = (index + i^2) % size; ",
+                "set value"};
+        }
+        else if (mode == DOUBLE_HASHING)
+        {
+            pseudoCode = {
+                "Insert_DoubleHashing: ",
+                "index = key % size; ",
+                "step = secondaryHash(key, size); ",
+                "while not empty: ",
+                "   index = (index + step) % size; ",
+                "set value"};
+        }
+        else if (mode == CHAINING)
+        {
+            pseudoCode = {
+                "Insert_Chaining: ",
+                "index = key % size; ",
+                "if empty: ",
+                "   create list; ",
+                "append value"};
+        }
+    }
+    else if (operation == "Search")
+    {
+        if (mode == LINEAR)
+        {
+            pseudoCode = {
+                "Search_LinearProbing: ",
+                "index = key % size; ",
+                "while not empty: ",
+                "   if match: ",
+                "       return index; ",
+                "   index = (index + 1) % size; ",
+                "return -1"};
+        }
+        else if (mode == QUADRATIC)
+        {
+            pseudoCode = {
+                "Search_QuadraticProbing: ",
+                "index = key % size; ",
+                "i = 0; ",
+                "while not empty: ",
+                "   if match: ",
+                "       return index; ",
+                "   i++; ",
+                "   index = (index + i^2) % size; ",
+                "return -1"};
+        }
+        else if (mode == DOUBLE_HASHING)
+        {
+            pseudoCode = {
+                "Search_DoubleHashing: ",
+                "index = key % size; ",
+                "step = secondaryHash(key, size); ",
+                "while not empty: ",
+                "   if match: ",
+                "       return index; ",
+                "   index = (index + step) % size; ",
+                "return -1"};
+        }
+        else if (mode == CHAINING)
+        {
+            pseudoCode = {
+                "Search_Chaining: ",
+                "index = key % size; ",
+                "if not empty: ",
+                "   for node in list: ",
+                "       if match: ",
+                "       return index; ",
+                "return -1"};
+        }
+    }
+    else if (operation == "Remove")
+    {
+        if (mode == LINEAR)
+        {
+            pseudoCode = {
+                "Remove_LinearProbing: ",
+                "index = key % size; ",
+                "while not empty: ",
+                "   if match: ",
+                "       set empty; ",
+                "       return true; ",
+                "   index = (index + 1) % size; ",
+                "return false"};
+        }
+        else if (mode == QUADRATIC)
+        {
+            pseudoCode = {
+                "Remove_QuadraticProbing: ",
+                "index = key % size; ",
+                "i = 0; ",
+                "while not empty: ",
+                "   if match: ",
+                "       set empty; ",
+                "       return true; ",
+                "   i++; ",
+                "   index = (index + i^2) % size; ",
+                "return false"};
+        }
+        else if (mode == DOUBLE_HASHING)
+        {
+            pseudoCode = {
+                "Remove_DoubleHashing: ",
+                "index = key % size; ",
+                "step = secondaryHash(key, size); ",
+                "while not empty: ",
+                "   if match: ",
+                "       set empty; ",
+                "       return true; ",
+                "   index = (index + step) % size; ",
+                "return false"};
+        }
+        else if (mode == CHAINING)
+        {
+            pseudoCode = {
+                "Remove_Chaining: ",
+                "index = key % size; ",
+                "if not empty: ",
+                "for node in list: ",
+                "   if match: ",
+                "       remove node; ",
+                "       return true; ",
+                "return false"};
+        }
+    }
+    DrawRectangle(1320, 600, 550, 300, LIGHTGRAY); // Vẽ nền cho hộp thoại
+    // Vẽ pseudocode trên màn hình
+    int x = 1320, y = 600;                   // Vị trí bắt đầu vẽ pseudocode
+    int lineHeight = GetFont().baseSize + 2; // Chiều cao mỗi dòng
+    for (size_t i = 0; i < pseudoCode.size(); ++i)
+    {
+        Color textColor = (i + 1 == highlightedLine) ? RED : BLACK; // Highlight dòng hiện tại
+        DrawTextEx(GetFont(), pseudoCode[i].c_str(), {float(x), float(y + i * lineHeight)}, GetFont().baseSize, 1, textColor);
     }
 }
