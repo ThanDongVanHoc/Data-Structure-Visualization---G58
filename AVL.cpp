@@ -10,6 +10,87 @@ using namespace std;
 namespace {
     // NOTE: All physics constants are now in Constants.h
 }
+// --- Các hàm helper cho animation --- //
+namespace {
+
+    // Kiểm tra vị trí đã ổn định (cho các node: so sánh vị trí hiện tại và target)
+    bool IsSettled(AVLNode* node, float tolerance) {
+        if (node == nullptr) return true;
+        
+        // Kiểm tra khoảng cách đến target
+        float dx = fabs(node->targetX - node->x);
+        float dy = fabs(node->targetY - node->y);
+        
+        // Kiểm tra cả vận tốc hiện tại
+        if ((dx > tolerance || dy > tolerance) || 
+            (fabs(node->vx) > SETTLE_VELOCITY || fabs(node->vy) > SETTLE_VELOCITY))
+            return false;
+            
+        return IsSettled(node->left, tolerance) && IsSettled(node->right, tolerance);
+    }
+
+    // Cập nhật hàm AnimateUntilSettled để thêm nhiều frame hơn và lưu vào animationStates
+    void AnimateUntilSettled(AVL &tree, float tolerance, int maxFrames) {
+        int frames = 0;
+        cout << "Bắt đầu animation cho đến khi settled...\n";
+        while (frames < maxFrames && !IsSettled(tree.getRoot(), tolerance)) {
+            if (WindowShouldClose()) break;
+            
+            // Update physics for all nodes
+            tree.animateNodes(tree.getRoot());
+            
+            // Capture current state for animation timeline
+            tree.animationStates.push_back(tree.captureCurrentState());
+            
+            // BeginDrawing();
+            //     tree.draw();
+            // EndDrawing();
+            
+            frames++;
+        }
+        
+        // Capture final settled state
+        tree.animationStates.push_back(tree.captureCurrentState());
+        cout << "Kết thúc animation sau " << frames << " frames.\n";
+    }
+
+    // Cập nhật hàm AnimateHighlight để thêm nhiều frame hơn
+    void AnimateHighlight(AVL &tree, AVLNode* node, Color targetColor, float alpha, int maxFrames) {
+        Color originalColor = node->color;
+        
+        for (int frame = 0; frame < maxFrames; frame++) {
+            // Calculate interpolated color for this frame
+            float progress = (float)frame / maxFrames;
+            node->color.r = (unsigned char)(originalColor.r + (targetColor.r - originalColor.r) * progress);
+            node->color.g = (unsigned char)(originalColor.g + (targetColor.g - originalColor.g) * progress);
+            node->color.b = (unsigned char)(originalColor.b + (targetColor.b - originalColor.b) * progress);
+            node->color.a = (unsigned char)(originalColor.a + (targetColor.a - originalColor.a) * progress);
+            
+            // Capture the state for this frame
+            tree.animationStates.push_back(tree.captureCurrentState());
+            
+            // BeginDrawing();
+            //     tree.draw();
+            // EndDrawing();
+        }
+        
+        // Set final color
+        node->color = targetColor;
+        
+        // Capture final state
+        tree.animationStates.push_back(tree.captureCurrentState());
+    }
+    
+    // Hàm điều chỉnh target positions để căn giữa cây trong màn hình 1920x1080
+    void CenterTargets(AVLNode* node, float offsetX, float offsetY) {
+        if (node == nullptr) return;
+        node->targetX += offsetX;
+        node->targetY += offsetY;
+        CenterTargets(node->left, offsetX, offsetY);
+        CenterTargets(node->right, offsetX, offsetY);
+    }
+    
+} // namespace
 
 
 int AVL::getHeight(AVLNode* node) {
@@ -252,6 +333,152 @@ void AVL::preOrder(AVLNode* node) {
         preOrder(node->left);
         preOrder(node->right);
     }
+}
+
+// Duyệt in-order để tính toán target positions cho các node, với margin ban đầu là 50.
+void AVL::computeTargets(AVLNode* node, int depth, float &xCounter) {
+    if (node == nullptr) return;
+    computeTargets(node->left, depth + 1, xCounter);
+    node->targetX = xCounter * HORIZONTAL_SPACING + 50;
+    node->targetY = depth * VERTICAL_SPACING + 50;
+    cout << "computeTargets: Node " << node->data << " tại depth " << depth 
+         << " -> targetX: " << node->targetX << ", targetY: " << node->targetY << "\n";
+    xCounter += 1.0f;
+    computeTargets(node->right, depth + 1, xCounter);
+}
+
+// Hàm updateTargets cập nhật layout và căn giữa toàn bộ cây
+// Trong hàm updateTargets() của AVL.cpp, điều chỉnh vị trí cây
+void AVL::updateTargets() {
+    cout << "Updating layout targets...\n";
+    float xCounter = 0.0f;
+    computeTargets(root, 0, xCounter);
+
+    // Tính offset để căn giữa theo chiều ngang:
+    float offsetX = 960 - ((100 + (xCounter - 1) * HORIZONTAL_SPACING) / 2);
+
+    // Tính offset theo chiều dọc: điều chỉnh để cây nằm cao hơn
+    // Thay vì căn giữa theo chiều dọc, giảm 150px để kéo cây lên trên
+    int h = (root != nullptr) ? root->height : 0;
+    float offsetY = 540 - ((100 + (h - 1) * VERTICAL_SPACING) / 2) - 150; 
+
+    // Áp dụng offset cho tất cả các node target
+    CenterTargets(root, offsetX, offsetY);
+}
+
+
+// Add more frames during animation in AnimateNodes
+void AVL::animateNodes(AVLNode* node) {
+    if (node == nullptr) return;
+    
+    float dx = node->targetX - node->x;
+    float dy = node->targetY - node->y;
+    
+    // Add a frame every few physics updates if nodes are still moving significantly
+    static int frameCounter = 0;
+    bool significantMovement = fabs(dx) > 2.0f || fabs(dy) > 2.0f || 
+                              fabs(node->vx) > 1.0f || fabs(node->vy) > 1.0f;
+                              
+    // Nếu node đã gần với target và vận tốc thấp, gắn nó vào target
+    if (fabs(dx) < SETTLE_DISTANCE && fabs(dy) < SETTLE_DISTANCE &&
+        fabs(node->vx) < SETTLE_VELOCITY && fabs(node->vy) < SETTLE_VELOCITY) {
+        node->x = node->targetX;
+        node->y = node->targetY;
+        node->vx = 0;
+        node->vy = 0;
+    } else {
+        // Tính lực kéo về target
+        float forceX = dx * SPRING_CONSTANT;
+        float forceY = dy * SPRING_CONSTANT;
+        
+        // Cập nhật vận tốc với lực cản (damping)
+        node->vx = (node->vx + forceX) * DAMPING;
+        node->vy = (node->vy + forceY) * DAMPING;
+        
+        // Giới hạn vận tốc tối đa
+        float speed = sqrt(node->vx * node->vx + node->vy * node->vy);
+        if (speed > MAX_VELOCITY) {
+            node->vx = (node->vx / speed) * MAX_VELOCITY;
+            node->vy = (node->vy / speed) * MAX_VELOCITY;
+        }
+        
+        // Cập nhật vị trí
+        node->x += node->vx;
+        node->y += node->vy;
+    }
+    
+    animateNodes(node->left);
+    animateNodes(node->right);
+}
+
+// Update phương thức drawTree để cải thiện hiển thị text
+// Update phương thức drawTree để loại bỏ hình vuông và làm text dễ đọc hơn
+void AVL::drawTree(AVLNode* node) {
+    if (node == nullptr) return;
+    
+    // Vẽ các đường nối với độ dày 2px và màu xám nhạt
+    if (node->left != nullptr) {
+        DrawLineEx(
+            (Vector2){ node->x, node->y }, 
+            (Vector2){ node->left->x, node->left->y }, 
+            2.0f, 
+            (Color){ 149, 165, 166, 255 }  // Màu xám (Silver)
+        );
+        drawTree(node->left);
+    }
+    
+    if (node->right != nullptr) {
+        DrawLineEx(
+            (Vector2){ node->x, node->y }, 
+            (Vector2){ node->right->x, node->right->y }, 
+            2.0f, 
+            (Color){ 149, 165, 166, 255 }  // Màu xám (Silver)
+        );
+        drawTree(node->right);
+    }
+    
+    // Vẽ bóng đổ nhẹ cho node để tạo hiệu ứng 3D
+    DrawCircle((int)node->x + 3, (int)node->y + 3, NODE_RADIUS, (Color){ 0, 0, 0, 50 });
+    
+    // Vẽ viền cho node
+    DrawCircleLines((int)node->x, (int)node->y, NODE_RADIUS + 2, NODE_BORDER_COLOR);
+    
+    // Vẽ node với màu hiện tại
+    DrawCircle((int)node->x, (int)node->y, NODE_RADIUS, node->color);
+    
+    // Vẽ giá trị của node trực tiếp, không có hộp text
+    char textValue[10];
+    sprintf(textValue, "%d", node->data);
+    
+    // Tính toán kích thước text để căn giữa
+    int textWidth = MeasureText(textValue, 20);  // Tăng kích thước font lên 20
+    
+    // Vẽ text chính
+    DrawText(textValue, (int)node->x - textWidth/2, (int)node->y - 10, 20, TEXT_COLOR);
+
+    // Vẽ thông tin chiều cao của cây con trái và phải
+    char leftHeight[5], rightHeight[5];
+    sprintf(leftHeight, "%d", getHeight(node->left));
+    sprintf(rightHeight, "%d", getHeight(node->right));
+    
+    // Vẽ chiều cao bên trái phía trên node - đậm và to hơn
+    DrawText(leftHeight, 
+        (int)node->x - NODE_RADIUS - 15, 
+        (int)node->y - NODE_RADIUS - 20, 
+        20,  // Tăng font size từ 16 lên 20
+        (Color){ 0, 0, 0, 255 });  // Màu đen hoàn toàn
+        
+    // Vẽ chiều cao bên phải phía trên node - đậm và to hơn
+    DrawText(rightHeight, 
+        (int)node->x + NODE_RADIUS - 5, 
+        (int)node->y - NODE_RADIUS - 20, 
+        20,  // Tăng font size từ 16 lên 20
+        (Color){ 0, 0, 0, 255 });  // Màu đen hoàn toàn
+        
+    // Vẽ giá trị node
+    sprintf(textValue, "%d", node->data);
+    textWidth = MeasureText(textValue, 20);
+    DrawText(textValue, (int)node->x - textWidth/2, (int)node->y - 10, 20, TEXT_COLOR);
 }
 
 
