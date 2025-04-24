@@ -1032,3 +1032,158 @@ void LinkedList::deleteValue(int value) {
 }
 
 
+
+// Clear animation states
+void LinkedList::clearAnimationStates() {
+    animationStates.clear();
+}
+
+// Check if current animation is complete
+bool LinkedList::isAnimationComplete() {
+    // Check if all nodes have reached their targets
+    Node* curr = head;
+    while (curr) {
+        float dx = curr->targetX - curr->x;
+        float dy = curr->targetY - curr->y;
+        if (fabs(dx) > SETTLE_DISTANCE || fabs(dy) > SETTLE_DISTANCE ||
+            fabs(curr->vx) > 0.1f || fabs(curr->vy) > 0.1f) {
+            return false;
+        }
+        curr = curr->next;
+    }
+    
+    // Check if any edge is still animating
+    for (const auto& edge : edges) {
+        if (edge.isAnimating && edge.animationProgress < 1.0f) {
+            return false;
+        }
+    }
+    
+    // Check if we're still in the middle of a delete operation
+    if (isDeleting) {
+        return false;
+    }
+    
+    return true;
+}
+
+// Undo/Redo Functions
+
+// Add current state to history
+void LinkedList::addStateToHistory() {
+    // If we're not at the end of history, remove future states
+    if (currentHistoryPosition < historyStates.size() - 1) {
+        historyStates.erase(historyStates.begin() + currentHistoryPosition + 1, 
+                           historyStates.end());
+    }
+    
+    // Add current state to history
+    historyStates.push_back(captureCurrentState());
+    currentHistoryPosition = historyStates.size() - 1;
+}
+
+bool LinkedList::canUndo() const {
+    return currentHistoryPosition > 0;
+}
+
+bool LinkedList::canRedo() const {
+    return currentHistoryPosition < historyStates.size() - 1;
+}
+
+// Restore the linked list structure from a saved state
+void LinkedList::restoreFromState(const LinkedListFrameState& state) {
+    // Clear the current list
+    while (head) {
+        Node* temp = head;
+        head = head->next;
+        delete temp;
+    }
+    head = nullptr;
+    
+    // Clear the edges
+    edges.clear();
+    lastInsertedNode = nullptr; // Reset lastInsertedNode to avoid dangling pointer
+    
+    // If the state is empty, we're done
+    if (state.nodes.empty()) {
+        return;
+    }
+    
+    // First pass: create all nodes
+    std::vector<Node*> nodeList(state.nodes.size(), nullptr);
+    for (size_t i = 0; i < state.nodes.size(); i++) {
+        const auto& nodeState = state.nodes[i];
+        Node* newNode = new Node(nodeState.value);
+        newNode->x = nodeState.x;
+        newNode->y = nodeState.y;
+        newNode->targetX = nodeState.x;  // Set target to current position
+        newNode->targetY = nodeState.y;
+        newNode->vx = 0;
+        newNode->vy = 0;
+        newNode->color = nodeState.color;
+        
+        nodeList[i] = newNode;
+    }
+    
+    // Second pass: link nodes
+    for (size_t i = 0; i < state.nodes.size(); i++) {
+        const auto& nodeState = state.nodes[i];
+        if (nodeState.nextNodeIndex >= 0 && nodeState.nextNodeIndex < nodeList.size()) {
+            nodeList[i]->next = nodeList[nodeState.nextNodeIndex];
+        } else {
+            nodeList[i]->next = nullptr;
+        }
+    }
+    
+    // Set head to first node
+    if (!nodeList.empty()) {
+        head = nodeList[0];
+    }
+    
+    // Recreate edges
+    for (const auto& edgeState : state.edges) {
+        if (edgeState.startNodeIndex >= 0 && edgeState.startNodeIndex < nodeList.size() &&
+            edgeState.endNodeIndex >= 0 && edgeState.endNodeIndex < nodeList.size()) {
+            ListEdge newEdge(nodeList[edgeState.startNodeIndex], nodeList[edgeState.endNodeIndex]);
+            newEdge.animationProgress = edgeState.animationProgress;
+            newEdge.isAnimating = edgeState.isAnimating;
+            edges.push_back(newEdge);
+        }
+    }
+    
+    // Restore pseudocode state
+    currentPseudoCode = state.pseudoCode;
+    currentHighlightedLine = state.highlightedLine;
+    currentOperation = state.operationName;
+    
+    // Ensure layout is refreshed
+    updateTargets();
+}
+
+const LinkedListFrameState& LinkedList::undo() {
+    if (canUndo()) {
+        currentHistoryPosition--;
+        // Restore the linked list to the previous state
+        restoreFromState(historyStates[currentHistoryPosition]);
+    }
+    return getCurrentHistoryState();
+}
+
+const LinkedListFrameState& LinkedList::redo() {
+    if (canRedo()) {
+        currentHistoryPosition++;
+        // Restore the linked list to the next state
+        restoreFromState(historyStates[currentHistoryPosition]);
+    }
+    return getCurrentHistoryState();
+}
+
+const LinkedListFrameState& LinkedList::getCurrentHistoryState() const {
+    if (historyStates.empty()) {
+        static LinkedListFrameState emptyState;
+        return emptyState;
+    }
+    return historyStates[currentHistoryPosition];
+}
+
+
