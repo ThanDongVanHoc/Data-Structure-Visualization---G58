@@ -920,6 +920,8 @@ void rendershortestpath(int screenWidth, int screenHeight)
             int currentstep = stoi(drawAction.text);
             stepdraw += 120 - currentstep;
         }
+        if (drawAction.type[0] == 'h')
+            stepdraw += 19;
         stepdraw = min(stepdraw, int(drawActions.size()) - 1);
         drawAction = drawActions[stepdraw];
         switch (drawAction.type[0]) // Use the first character of the type string for switch
@@ -950,6 +952,8 @@ void rendershortestpath(int screenWidth, int screenHeight)
             int currentstep = stoi(drawAction.text);
             stepdraw -= currentstep + 1;
         }
+        if (drawAction.type[0] == 'h')
+            stepdraw -= 19;
         stepdraw = max(0, stepdraw);
         for (int i = 0; i <= stepdraw; i++)
         {
