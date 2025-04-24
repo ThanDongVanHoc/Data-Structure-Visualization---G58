@@ -11,9 +11,10 @@
 Font customFont;
 
 // Các hằng số cho kích thước node, khoảng cách, và khung hình
-#define NODE_RADIUS 30  // Changed from NODE_WIDTH/HEIGHT to NODE_RADIUS
+#define NODE_WIDTH 50
+#define NODE_HEIGHT 50
 // Tăng GAP từ 50 lên 70 để đảm bảo phần đầu mũi tên không bị che.
-#define GAP 120  // Increased for better spacing between circular nodes
+#define GAP 100
 
 #define SCREEN_WIDTH 1920
 #define SCREEN_HEIGHT 1080
@@ -27,17 +28,13 @@ Font customFont;
 // Thời gian delay cho hiệu ứng highlight (mili giây)
 #define HIGHLIGHT_DELAY 100
 
-// Updated color scheme
-#define NODE_DEFAULT_COLOR (Color){52, 152, 219, 255}  // Nice blue
-#define NODE_BORDER_COLOR (Color){41, 128, 185, 255}   // Darker blue for border
-#define HIGHLIGHT_COLOR (Color){241, 196, 15, 255}     // Brighter yellow
-#define DELETE_HIGHLIGHT_COLOR (Color){231, 76, 60, 255} // Vivid red
+// Các màu mặc định và màu highlight
+#define NODE_DEFAULT_COLOR LIGHTGRAY
+#define HIGHLIGHT_COLOR YELLOW
+#define DELETE_HIGHLIGHT_COLOR RED
 
 // Tốc độ animation của cạnh
 #define EDGE_ANIMATION_SPEED 0.05f
-
-// Added shadow offset
-#define SHADOW_OFFSET 4
 
 // =======================
 // Node implementation
@@ -120,16 +117,14 @@ void LinkedList::updateTargets() {
         curr = curr->next;
     }
     if (count == 0) return;
-    
-    // Adjusted for node radius instead of width
-    float totalWidth = count * (2 * NODE_RADIUS) + (count - 1) * GAP;
-    float startX = (SCREEN_WIDTH - totalWidth) / 2.0f + NODE_RADIUS;
-    float startY = (SCREEN_HEIGHT - NODE_RADIUS) / 2.0f;
+    float totalWidth = count * NODE_WIDTH + (count - 1) * GAP;
+    float startX = (SCREEN_WIDTH - totalWidth) / 2.0f;
+    float startY = (SCREEN_HEIGHT - NODE_HEIGHT) / 2.0f;
     
     curr = head;
     int index = 0;
     while (curr) {
-        curr->targetX = startX + index * (2 * NODE_RADIUS + GAP);
+        curr->targetX = startX + index * (NODE_WIDTH + GAP);
         curr->targetY = startY;
         index++;
         curr = curr->next;
@@ -331,74 +326,16 @@ void LinkedList::updateAnimation() {
 void LinkedList::visualize() {
     if (!head) return;
     
-    // Draw edges first (so they appear behind nodes)
-    for (const auto& edge : edges) {
-        if (edge.animationProgress > 0) {
-            // Start position is right side of start node
-            float startX = edge.startNode->x + NODE_RADIUS;
-            float startY = edge.startNode->y;
-            
-            // End position is left side of end node with an offset to prevent overlap
-            float endX = edge.endNode->x - NODE_RADIUS;
-            float endY = edge.endNode->y;
-            
-            // Leave space before the end node (20 pixels) for arrow visibility
-            float arrowOffset = 20;
-            
-            // Calculate the effective endpoint with offset
-            float effectiveEndX = endX - arrowOffset;
-            
-            // Calculate total distance and current distance
-            float totalDistance = effectiveEndX - startX;
-            float currentDistance = totalDistance * edge.animationProgress;
-            
-            // Calculate current endpoint
-            float currentEndX = startX + currentDistance;
-            
-            // Draw the main line with increased thickness
-            DrawLineEx(
-                (Vector2){startX, startY},
-                (Vector2){currentEndX, startY},
-                3.0f, // thicker line
-                (Color){52, 73, 94, 255} // Dark slate for edges
-            );
-            
-            // Draw arrow head as a proper triangle
-            if (edge.animationProgress > 0.9f) {
-                // Define the three vertices of the triangle arrow head
-                Vector2 v1 = { currentEndX, startY - 10 };       // Top vertex
-                Vector2 v2 = { currentEndX, startY + 10 };       // Bottom vertex
-                Vector2 v3 = { currentEndX + 15, startY };       // Tip vertex (pointing right)
-                
-                // Draw the triangle with proper vertex ordering
-                DrawTriangle(v1, v2, v3, (Color){231, 76, 60, 255}); // Red arrow
-            }
-        }
-    }
-    
-    // Draw nodes
+    // Draw nodes first
     Node* curr = head;
     while (curr) {
-        // Draw shadow for 3D effect
-        DrawCircle((int)curr->x + SHADOW_OFFSET, (int)curr->y + SHADOW_OFFSET, 
-                   NODE_RADIUS, (Color){0, 0, 0, 60});
+        DrawRectangle((int)curr->x, (int)curr->y, NODE_WIDTH, NODE_HEIGHT, curr->color);
         
-        // Draw node with gradient for more appealing look
-        DrawCircleGradient(
-            (int)curr->x, (int)curr->y, 
-            NODE_RADIUS, 
-            curr->color,
-            ColorBrightness(curr->color, 0.7f)
-        );
-        
-        // Draw outline
-        DrawCircleLines((int)curr->x, (int)curr->y, NODE_RADIUS, NODE_BORDER_COLOR);
-        
-        // Draw node value with better positioning
+        // Draw node value
         char text[16];
         sprintf(text, "%d", curr->value);
         int textWidth = MeasureText(text, 20);
-        DrawText(text, (int)curr->x - textWidth/2, (int)curr->y - 10, 20, WHITE);
+        DrawText(text, (int)curr->x + (NODE_WIDTH - textWidth) / 2, (int)curr->y + (NODE_HEIGHT / 2 - 10), 20, BLACK);
         
         curr = curr->next;
     }
@@ -407,15 +344,15 @@ void LinkedList::visualize() {
     for (const auto& edge : edges) {
         if (edge.animationProgress > 0) {
             // Start position is right side of start node
-            float startX = edge.startNode->x + NODE_RADIUS;
-            float startY = edge.startNode->y;
+            float startX = edge.startNode->x + NODE_WIDTH;
+            float startY = edge.startNode->y + NODE_HEIGHT / 2;
             
             // End position is left side of end node with an offset to prevent overlap
-            float endX = edge.endNode->x - NODE_RADIUS;
-            float endY = edge.endNode->y;
+            float endX = edge.endNode->x;
+            float endY = edge.endNode->y + NODE_HEIGHT / 2;
             
-            // Leave space before the end node (20 pixels) for arrow visibility
-            float arrowOffset = 20;
+            // Leave space before the end node (30 pixels) for arrow visibility
+            float arrowOffset = 30;
             
             // Calculate the effective endpoint with offset
             float effectiveEndX = endX - arrowOffset;
@@ -432,7 +369,7 @@ void LinkedList::visualize() {
                 (Vector2){startX, startY},
                 (Vector2){currentEndX, startY},
                 3.0f, // thicker line
-                (Color){52, 73, 94, 255} // Dark slate for edges
+                BLACK
             );
             
             // Draw arrow head as a proper triangle
@@ -440,10 +377,10 @@ void LinkedList::visualize() {
                 // Define the three vertices of the triangle arrow head
                 Vector2 v1 = { currentEndX, startY - 10 };       // Top vertex
                 Vector2 v2 = { currentEndX, startY + 10 };       // Bottom vertex
-                Vector2 v3 = { currentEndX + 15, startY };       // Tip vertex (pointing right)
+                Vector2 v3 = { currentEndX + 10, startY };       // Tip vertex (pointing right)
                 
                 // Draw the triangle with proper vertex ordering
-                DrawTriangle(v1, v2, v3, (Color){231, 76, 60, 255}); // Red arrow
+                DrawTriangle(v1, v2, v3, RED);
             }
         }
     }
@@ -463,130 +400,6 @@ void LinkedList::visualize() {
     //         DrawTextEx(customFont, currentPseudoCode[i].c_str(), (Vector2){startX, startY + i * lineHeight}, 20, 1, textColor);
     //     }
     // }
-    
-    // Create a stylish pill-shaped button with gradient and shadow
-    float buttonX = 1650;
-    float buttonY = 1000;
-    if(showPseudoCode == true) buttonY = 700;
-    float buttonWidth = 220;
-    float buttonHeight = 40;
-    
-    // Draw shadow for floating effect
-    DrawRectangleRounded(
-        (Rectangle){buttonX + 3, buttonY + 3, buttonWidth, buttonHeight},
-        0.5, 8, (Color){20, 20, 20, 50}
-    );
-    
-    // Draw main button background - gradient
-    Color startColor = showPseudoCode ? (Color){142, 68, 173, 240} : (Color){52, 152, 219, 240};
-    Color endColor = showPseudoCode ? (Color){155, 89, 182, 240} : (Color){41, 128, 185, 240};
-    
-    // Create a pill shape with two half-circles and a rectangle
-    float radius = buttonHeight / 2;
-    
-    // Left half-circle
-    DrawCircleGradient(
-        buttonX + radius, buttonY + radius,
-        radius,
-        startColor, endColor
-    );
-    
-    // Right half-circle
-    DrawCircleGradient(
-        buttonX + buttonWidth - radius, buttonY + radius,
-        radius,
-        endColor, startColor
-    );
-    
-    // Center rectangle with gradient
-    DrawRectangleGradientH(
-        buttonX + radius, buttonY,
-        buttonWidth - buttonHeight, buttonHeight,
-        startColor, endColor
-    );
-    
-    // Draw outline
-    DrawRing(
-        (Vector2){buttonX + radius, buttonY + radius}, 
-        radius - 1, radius, 0, 180, 36, 
-        showPseudoCode ? (Color){142, 68, 173, 255} : (Color){41, 128, 185, 255}
-    );
-    DrawRing(
-        (Vector2){buttonX + buttonWidth - radius, buttonY + radius}, 
-        radius - 1, radius, 180, 360, 36, 
-        showPseudoCode ? (Color){142, 68, 173, 255} : (Color){41, 128, 185, 255}
-    );
-    DrawRectangle(
-        buttonX + radius, buttonY - 1,
-        buttonWidth - buttonHeight, 2,
-        showPseudoCode ? (Color){142, 68, 173, 255} : (Color){41, 128, 185, 255}
-    );
-    DrawRectangle(
-        buttonX + radius, buttonY + buttonHeight - 1,
-        buttonWidth - buttonHeight, 2,
-        showPseudoCode ? (Color){142, 68, 173, 255} : (Color){41, 128, 185, 255}
-    );
-    
-    // Draw icon instead of text
-    if (showPseudoCode) {
-        // Eye icon with slash (hide)
-        DrawCircleLines(buttonX + 50, buttonY + radius, 10, WHITE);
-        DrawLine(buttonX + 38, buttonY + radius - 12, buttonX + 62, buttonY + radius + 12, WHITE);
-    } else {
-        // Eye icon (show)
-        DrawCircleLines(buttonX + 50, buttonY + radius, 10, WHITE);
-        DrawCircle(buttonX + 50, buttonY + radius, 4, WHITE);
-    }
-    
-    // Draw text with shadow effect for depth
-    const char* buttonText = showPseudoCode ? "Hide Algorithm" : "Show Algorithm";
-    DrawText(buttonText, buttonX + 80 + 1, buttonY + 13 + 1, 18, (Color){0, 0, 0, 120});
-    DrawText(buttonText, buttonX + 80, buttonY + 13, 18, WHITE);
-    
-    // Only draw pseudocode if toggle is on
-    if (showPseudoCode && !currentPseudoCode.empty()) {
-        int startX = 1400;
-        int startY = 800;
-        int lineHeight = 30;
-        int paddingX = 20;
-        int paddingY = 15;
-        
-        // Calculate box dimensions based on content
-        int boxWidth = 0;
-        for (const auto& line : currentPseudoCode) {
-            int width = MeasureText(line.c_str(), 20) + 2 * paddingX;
-            boxWidth = std::max(boxWidth, width);
-        }
-        
-        // Make sure the box is wide enough for the title too
-        int titleWidth = MeasureText(currentOperation.c_str(), 24) + 2 * paddingX;
-        boxWidth = std::max(boxWidth, titleWidth);
-        
-        int boxHeight = currentPseudoCode.size() * lineHeight + 2 * paddingY + lineHeight; // Extra line for title
-        
-        // Draw background box with drop shadow
-        DrawRectangle(startX - paddingX + 5, startY - lineHeight - paddingY + 5, 
-                     boxWidth, boxHeight, (Color){40, 40, 40, 100}); // Shadow
-        
-        DrawRectangleRounded(
-            (Rectangle){startX - paddingX, startY - lineHeight - paddingY, boxWidth, boxHeight}, 
-            0.1, 8, (Color){240, 240, 240, 240}
-        );
-        
-        DrawRectangleRoundedLines(
-            (Rectangle){startX - paddingX, startY - lineHeight - paddingY, boxWidth, boxHeight}, 
-            0.1, 8, (Color){100, 100, 100, 200}
-        );
-        
-        // Draw operation name (title)
-        DrawTextEx(customFont, currentOperation.c_str(), (Vector2){startX, startY - lineHeight}, 24, 1, BLACK);
-        
-        // Draw each line of pseudocode
-        for (size_t i = 0; i < currentPseudoCode.size(); i++) {
-            Color textColor = (i == currentHighlightedLine) ? RED : BLACK;
-            DrawTextEx(customFont, currentPseudoCode[i].c_str(), (Vector2){startX, startY + i * lineHeight}, 20, 1, textColor);
-        }
-    }
 }
 
 // Helper function to set pseudocode for addHead operation
@@ -816,8 +629,8 @@ void LinkedList::addHead(int value) {
     setPseudoCodeAddHead(value);
     
     Node* newNode = new Node(value);
-    newNode->x = -NODE_RADIUS;
-    newNode->y = (SCREEN_HEIGHT - NODE_RADIUS) / 2.0f;
+    newNode->x = -NODE_WIDTH;
+    newNode->y = (SCREEN_HEIGHT - NODE_HEIGHT) / 2.0f;
     
     // Add to the beginning of the list
     newNode->next = head;
@@ -836,7 +649,7 @@ void LinkedList::addTail(int value) {
     
     Node* newNode = new Node(value);
     newNode->x = SCREEN_WIDTH;
-    newNode->y = (SCREEN_HEIGHT - NODE_RADIUS) / 2.0f;
+    newNode->y = (SCREEN_HEIGHT - NODE_HEIGHT) / 2.0f;
     
     TailNode = newNode; // Initialize TailNode if head is null
     if (!head) {
@@ -871,7 +684,7 @@ void LinkedList::insertAfter(int index, int value) {
     Node* newNode = new Node(value);
     currentHighlightedLine = 4;
     newNode->x = curr->targetX;
-    newNode->y = -NODE_RADIUS;
+    newNode->y = -NODE_HEIGHT;
     
     // Handle next pointers
     newNode->next = curr->next;
@@ -1099,7 +912,19 @@ LinkedListFrameState LinkedList::captureCurrentState() {
 
 // Visualize a specific saved state
 void LinkedList::visualizeState(const LinkedListFrameState& state) {
-    // Draw edges first
+    // Draw nodes
+    for (size_t i = 0; i < state.nodes.size(); i++) {
+        const auto& node = state.nodes[i];
+        DrawRectangle((int)node.x, (int)node.y, NODE_WIDTH, NODE_HEIGHT, node.color);
+        // Draw node value
+        char text[16];
+        sprintf(text, "%d", node.value);
+        int textWidth = MeasureText(text, 20);
+        DrawText(text, (int)node.x + (NODE_WIDTH - textWidth) / 2, 
+                (int)node.y + (NODE_HEIGHT / 2 - 10), 20, BLACK);
+    }
+    
+    // Draw edges
     for (const auto& edge : state.edges) {
         if (edge.animationProgress > 0 && 
             edge.startNodeIndex < state.nodes.size() && 
@@ -1109,15 +934,15 @@ void LinkedList::visualizeState(const LinkedListFrameState& state) {
             const auto& endNode = state.nodes[edge.endNodeIndex];
             
             // Start position is right side of start node
-            float startX = startNode.x + NODE_RADIUS;
-            float startY = startNode.y;
+            float startX = startNode.x + NODE_WIDTH;
+            float startY = startNode.y + NODE_HEIGHT / 2;
             
             // End position is left side of end node
-            float endX = endNode.x - NODE_RADIUS;
-            float endY = endNode.y;
+            float endX = endNode.x;
+            float endY = endNode.y + NODE_HEIGHT / 2;
             
             // Leave space before the end node for arrow visibility
-            float arrowOffset = 20;
+            float arrowOffset = 30;
             
             // Calculate the effective endpoint with offset
             float effectiveEndX = endX - arrowOffset;
@@ -1134,7 +959,7 @@ void LinkedList::visualizeState(const LinkedListFrameState& state) {
                 (Vector2){startX, startY},
                 (Vector2){currentEndX, startY},
                 3.0f,
-                (Color){52, 73, 94, 255} // Dark slate for edges
+                BLACK
             );
             
             // Draw arrow head
@@ -1142,38 +967,12 @@ void LinkedList::visualizeState(const LinkedListFrameState& state) {
                 // Define the three vertices of the triangle arrow head
                 Vector2 v1 = { currentEndX, startY - 10 };       // Top vertex
                 Vector2 v2 = { currentEndX, startY + 10 };       // Bottom vertex
-                Vector2 v3 = { currentEndX + 15, startY };       // Tip vertex (pointing right)
+                Vector2 v3 = { currentEndX + 10, startY };       // Tip vertex (pointing right)
                 
                 // Draw the triangle with proper vertex ordering
-                DrawTriangle(v1, v2, v3, (Color){231, 76, 60, 255}); // Red arrow
+                DrawTriangle(v1, v2, v3, RED);
             }
         }
-    }
-    
-    // Draw nodes with shadow and gradient effects
-    for (size_t i = 0; i < state.nodes.size(); i++) {
-        const auto& node = state.nodes[i];
-        
-        // Draw shadow for 3D effect
-        DrawCircle((int)node.x + SHADOW_OFFSET, (int)node.y + SHADOW_OFFSET, 
-                   NODE_RADIUS, (Color){0, 0, 0, 60});
-        
-        // Draw node with gradient
-        DrawCircleGradient(
-            (int)node.x, (int)node.y, 
-            NODE_RADIUS, 
-            node.color,
-            ColorBrightness(node.color, 0.7f)
-        );
-        
-        // Draw outline
-        DrawCircleLines((int)node.x, (int)node.y, NODE_RADIUS, NODE_BORDER_COLOR);
-        
-        // Draw node value with better positioning
-        char text[16];
-        sprintf(text, "%d", node.value);
-        int textWidth = MeasureText(text, 20);
-        DrawText(text, (int)node.x - textWidth/2, (int)node.y - 10, 20, WHITE);
     }
     
     // // Draw pseudocode with highlighting if available
@@ -1191,7 +990,6 @@ void LinkedList::visualizeState(const LinkedListFrameState& state) {
     //         DrawTextEx(customFont, state.pseudoCode[i].c_str(), (Vector2){startX, startY + i * lineHeight}, 20, 1, textColor);
     //     }
     // }
-    
     // Create a stylish pill-shaped button with gradient and shadow
     float buttonX = 1650;
     float buttonY = 1000;
@@ -1310,12 +1108,15 @@ void LinkedList::visualizeState(const LinkedListFrameState& state) {
         DrawTextEx(customFont, currentOperation.c_str(), (Vector2){startX, startY - lineHeight}, 24, 1, BLACK);
         
         // Draw each line of pseudocode
-        for (size_t i = 0; i < currentPseudoCode.size(); i++) {
-            Color textColor = (i == currentHighlightedLine) ? RED : BLACK;
-            DrawTextEx(customFont, currentPseudoCode[i].c_str(), (Vector2){startX, startY + i * lineHeight}, 20, 1, textColor);
+        for (size_t i = 0; i < state.pseudoCode.size(); i++) {
+            Color textColor = (i == state.highlightedLine) ? RED : BLACK;
+            DrawTextEx(customFont, state.pseudoCode[i].c_str(), (Vector2){startX, startY + i * lineHeight}, 20, 1, textColor);
         }
     }
 }
+
+
+
 
 // Process the entire animation for a query and store states
 std::vector<LinkedListFrameState> LinkedList::processQueryAnimation() {
@@ -1585,6 +1386,7 @@ void LinkedList::removeAtIndex(int index) {
     
     // Clear any previous animation states
     
+    
     // If index is 0, we're deleting the head
     if (index == 0) {
         if (head) {
@@ -1805,8 +1607,8 @@ void LinkedList::createRandom(int size) {
     createEmpty();
     
     // Calculate initial positions
-    float startX = (SCREEN_WIDTH - (size-1)*GAP - NODE_RADIUS) / 2.0f;
-    float startY = (SCREEN_HEIGHT - NODE_RADIUS) / 2.0f;
+    float startX = (SCREEN_WIDTH - (size-1)*GAP - NODE_WIDTH) / 2.0f;
+    float startY = (SCREEN_HEIGHT - NODE_HEIGHT) / 2.0f;
 
     // Generate random numbers and add to list
     for(int i = 0; i < size; i++) {
@@ -1814,7 +1616,7 @@ void LinkedList::createRandom(int size) {
         Node* newNode = new Node(value);
         
         // Set position directly to target
-        newNode->x = startX + i * (2 * NODE_RADIUS + GAP);
+        newNode->x = startX + i * (NODE_WIDTH + GAP);
         newNode->y = startY;
         newNode->targetX = newNode->x;
         newNode->targetY = newNode->y;
@@ -1844,8 +1646,8 @@ void LinkedList::createRandomSorted(int size) {
     createEmpty();
     
     // Calculate initial positions
-    float startX = (SCREEN_WIDTH - (size-1)*GAP - NODE_RADIUS) / 2.0f;
-    float startY = (SCREEN_HEIGHT - NODE_RADIUS) / 2.0f;
+    float startX = (SCREEN_WIDTH - (size-1)*GAP - NODE_WIDTH) / 2.0f;
+    float startY = (SCREEN_HEIGHT - NODE_HEIGHT) / 2.0f;
     
     // Generate sorted numbers
     std::vector<int> numbers;
@@ -1860,7 +1662,7 @@ void LinkedList::createRandomSorted(int size) {
         Node* newNode = new Node(numbers[i]);
         
         // Set position directly to target
-        newNode->x = startX + i * (2 * NODE_RADIUS + GAP);
+        newNode->x = startX + i * (NODE_WIDTH + GAP);
         newNode->y = startY;
         newNode->targetX = newNode->x;
         newNode->targetY = newNode->y;
