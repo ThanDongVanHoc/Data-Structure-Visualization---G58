@@ -125,6 +125,22 @@ void MST::unionVertices(int u, int v) {
     int pv = findParent(v);
     parent[pu] = pv;
 }
+Color MST::interpolateColor(Color start, Color end, float t) {
+    Color result;
+    result.r = start.r + (int)((end.r - start.r) * t);
+    result.g = start.g + (int)((end.g - start.g) * t);
+    result.b = start.b + (int)((end.b - start.b) * t);
+    result.a = start.a + (int)((end.a - start.a) * t);
+    return result;
+}
+
+void MST::animateEdgeColor(Edge &e, Color start, Color end, int durationMs) {
+    int frames = durationMs / FRAME_DELAY_MS;
+    for (int f = 0; f <= frames; f++) {
+        float t = (float)f / frames;
+        e.color = interpolateColor(start, end, t);
+    }
+}
 
 void MST::runKruskal() {
     // Initialize pseudocode
@@ -470,4 +486,521 @@ void MST::drawGraph() {
         DrawText(s.c_str(), pos.x - textWidth/2 + 1, pos.y - 11 + 1, 22, (Color){0, 0, 0, 128});
         DrawText(s.c_str(), pos.x - textWidth/2, pos.y - 11, 22, textColor);
     }
+}
+
+
+// NEW: Draw mode toggle button separately
+void MST::drawModeToggle() {
+    float buttonX = 1750;
+    float buttonY = 120;
+    Rectangle modeToggleButton = {buttonX, buttonY, 150, 50}; // Larger button
+    
+    DrawRectangleRounded(modeToggleButton, 0.3, 6, 
+                        fixedPositionMode ? (Color){155, 89, 182, 230} : (Color){52, 152, 219, 230});
+    DrawRectangleRoundedLines(modeToggleButton, 0.3, 6, 
+                             fixedPositionMode ? (Color){142, 68, 173, 255} : (Color){41, 128, 185, 255});
+    
+    const char* modeText = fixedPositionMode ? "Fixed Position" : "Physics Mode";
+    DrawText(modeText, modeToggleButton.x + 5, modeToggleButton.y + 15, 20, WHITE);
+}
+
+// NEW: Handle mode toggle button interaction separately
+void MST::handleModeToggleInteraction() {
+    Vector2 mousePos = GetMousePosition();
+    
+    float buttonX = 1750;
+    float buttonY = 120;
+    Rectangle modeToggleButton = {buttonX, buttonY, 150, 50}; // Match size with drawModeToggle
+    
+    if (CheckCollisionPointRec(mousePos, modeToggleButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        toggleFixedPositionMode();
+    }
+}
+
+// Modify drawProgressBar to include stepping buttons
+void MST::drawProgressBar() {
+    if (animationFrames.empty()) return;
+    
+    // Increase progress bar size
+    float progressWidth = 500; // Increased from 300
+    float progressHeight = 25; // Increased from 20
+    float progressX = (1920 - progressWidth) / 2;
+    float progressY = 1080 - 100; // Position at the bottom with some margin
+    
+    // Update progress bar rectangle for interaction
+    progressBarRect = (Rectangle){progressX, progressY, progressWidth, progressHeight};
+    
+    // Draw scrubber track with better appearance - add shadows for depth
+    DrawRectangleRounded(
+        (Rectangle){progressX - 3, progressY - 3, progressWidth + 6, progressHeight + 6}, 
+        0.5, 8, (Color){40, 40, 40, 100} // Shadow
+    );
+    
+    // Draw track background with gradient effect
+    DrawRectangleGradientH(
+        progressX, progressY, 
+        progressWidth, progressHeight, 
+        (Color){220, 220, 220, 255}, 
+        (Color){180, 180, 180, 255}
+    );
+    
+    // Draw track outline
+    DrawRectangleRoundedLines(
+        (Rectangle){progressX, progressY, progressWidth, progressHeight}, 
+        0.5, 8,  (Color){120, 120, 120, 200}
+    );
+    
+    // Draw progress fill with gradient
+    float progress = (float)currentFrame / (animationFrames.size() - 1);
+    DrawRectangleGradientH(
+        progressX, progressY, 
+        progressWidth * progress, progressHeight,
+        (Color){66, 134, 244, 255}, // Bright blue
+        (Color){41, 128, 185, 255}  // Darker blue
+    );
+    
+    // Draw scrubber handle with improved appearance
+    float handleX = progressX + progressWidth * progress;
+    float handleRadius = 15; // Increased from 12
+    
+    // Handle shadow
+    DrawCircle(handleX + 2, progressY + progressHeight/2 + 2, handleRadius, (Color){40, 40, 40, 80});
+    
+    // Handle body
+    DrawCircleGradient(
+        handleX, progressY + progressHeight/2, 
+        handleRadius,
+        isDraggingProgressBar ? (Color){255, 100, 100, 255} : (Color){255, 255, 255, 255},
+        isDraggingProgressBar ? (Color){200, 50, 50, 255} : (Color){220, 220, 220, 255}
+    );
+    
+    // Handle outline
+    DrawCircleLines(handleX, progressY + progressHeight/2, handleRadius, (Color){100, 100, 100, 200});
+    
+    // Draw frame counter with larger text
+    DrawText(
+        TextFormat("Frame: %d / %d", currentFrame, (int)animationFrames.size()-1),
+        progressX, progressY - 30, 22, (Color){50, 50, 50, 255}
+    );
+    
+    // LARGER BUTTONS: Play/pause button
+    Rectangle playPauseButton = {progressX - 70, progressY - 10, 50, 45}; // Much larger
+    DrawRectangleRounded(playPauseButton, 0.3, 6, 
+                        isPaused ? (Color){52, 152, 219, 230} : (Color){46, 204, 113, 230});
+    DrawRectangleRoundedLines(playPauseButton, 0.3, 6, 
+                             isPaused ? (Color){41, 128, 185, 255} : (Color){39, 174, 96, 255});
+    
+    // Draw play/pause icon - larger
+    if (isPaused) {
+        DrawTriangle(
+            (Vector2){playPauseButton.x + 13, playPauseButton.y + 8},
+            (Vector2){playPauseButton.x + 13, playPauseButton.y + 37},
+            (Vector2){playPauseButton.x + 40, playPauseButton.y + 22},
+            WHITE
+        );
+    } else {
+        DrawRectangle(playPauseButton.x + 15, playPauseButton.y + 8, 8, 29, WHITE);
+        DrawRectangle(playPauseButton.x + 28, playPauseButton.y + 8, 8, 29, WHITE);
+    }
+    
+    // LARGER BUTTONS: Speed controls
+    Rectangle speedDecButton = {progressX + progressWidth + 20, progressY - 10, 45, 45}; // Larger
+    Rectangle speedIncButton = {progressX + progressWidth + 70, progressY - 10, 45, 45}; // Larger
+    
+    DrawRectangleRounded(speedDecButton, 0.3, 6, (Color){192, 57, 43, 230});
+    DrawRectangleRoundedLines(speedDecButton, 0.3, 6,  (Color){150, 40, 30, 255});
+    
+    DrawRectangleRounded(speedIncButton, 0.3, 6, (Color){39, 174, 96, 230});
+    DrawRectangleRoundedLines(speedIncButton, 0.3, 6,  (Color){33, 148, 83, 255});
+    
+    // Larger text on buttons
+    DrawText("-", speedDecButton.x + 18, speedDecButton.y + 10, 25, WHITE);
+    DrawText("+", speedIncButton.x + 16, speedIncButton.y + 10, 25, WHITE);
+    
+    DrawText(TextFormat("Speed: %dx", frameSkip), 
+            speedDecButton.x, speedDecButton.y - 30, 20, DARKGRAY);
+    
+    // LARGER BUTTONS: Step navigation buttons
+    Rectangle backwardButton = {progressX - 130, progressY - 10, 55, 45}; // Much larger
+    Rectangle forwardButton = {progressX - 195, progressY - 10, 55, 45}; // Much larger
+    
+    Color backwardColor = (currentFrame > 0) ? 
+                      (Color){41, 128, 185, 230} : (Color){150, 150, 150, 150};
+    Color forwardColor = (currentFrame < animationFrames.size() - 1) ? 
+                      (Color){41, 128, 185, 230} : (Color){150, 150, 150, 150};
+    
+    DrawRectangleRounded(backwardButton, 0.3, 6, backwardColor);
+    DrawRectangleRoundedLines(backwardButton, 0.3, 6, 
+                           (currentFrame > 0) ? (Color){25, 80, 130, 255} : (Color){100, 100, 100, 150});
+    
+    DrawRectangleRounded(forwardButton, 0.3, 6, forwardColor);
+    DrawRectangleRoundedLines(forwardButton, 0.3, 6, 
+                           (currentFrame < animationFrames.size() - 1) ? (Color){25, 80, 130, 255} : (Color){100, 100, 100, 150});
+    
+    // Larger text on buttons
+    DrawText("Next", backwardButton.x + 10, backwardButton.y + 12, 20, WHITE);
+    DrawText("Prev", forwardButton.x + 10, forwardButton.y + 12, 20, WHITE);
+    
+    DrawText("Step By Code Line", backwardButton.x - 30, backwardButton.y - 30, 20, DARKGRAY);
+    
+    // Draw pseudocode
+    drawPseudoCode();
+}
+
+void MST::handleProgressBarInteraction() {
+    if (animationFrames.empty()) return;
+    
+    Vector2 mousePos = GetMousePosition();
+    
+    // Update button coordinates to match the new sizes in drawProgressBar
+    float progressX = progressBarRect.x;
+    float progressY = progressBarRect.y;
+    float progressWidth = progressBarRect.width;
+    
+    // Check for play/pause button click - updated size
+    Rectangle playPauseButton = {progressX - 70, progressY - 10, 50, 45};
+    if (CheckCollisionPointRec(mousePos, playPauseButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        isPaused = !isPaused;
+        isPlayingAnimation = !isPaused;
+        return;
+    }
+    
+    // Updated button sizes for interaction detection
+    Rectangle forwardButton = {progressX - 130, progressY - 10, 55, 45};
+    Rectangle backwardButton = {progressX - 195, progressY - 10, 55, 45};
+    
+    if (CheckCollisionPointRec(mousePos, backwardButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        stepBackward();
+        return;
+    }
+    
+    if (CheckCollisionPointRec(mousePos, forwardButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        stepForward();
+        return;
+    }
+    
+    // Check for speed control clicks - updated sizes
+    Rectangle speedDecButton = {progressX + progressWidth + 20, progressY - 10, 45, 45};
+    Rectangle speedIncButton = {progressX + progressWidth + 70, progressY - 10, 45, 45};
+    
+    if (CheckCollisionPointRec(mousePos, speedDecButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        if (frameSkip > 1) frameSkip--;
+        return;
+    }
+    
+    if (CheckCollisionPointRec(mousePos, speedIncButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        if (frameSkip < 10) frameSkip++;
+        return;
+    }
+    
+    // Handle mouse press on progress bar
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && 
+        CheckCollisionPointRec(mousePos, (Rectangle){
+            progressBarRect.x - 10, // Make the hit area a bit larger
+            progressBarRect.y - 10,
+            progressBarRect.width + 20,
+            progressBarRect.height + 20
+        })) {
+        isDraggingProgressBar = true;
+    }
+    
+    // Handle mouse drag on progress bar
+    if (isDraggingProgressBar) {
+        if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+            // Calculate new position based on mouse position
+            float progress = (mousePos.x - progressBarRect.x) / progressBarRect.width;
+            
+            // Clamp progress between 0 and 1
+            progress = progress < 0 ? 0 : (progress > 1 ? 1 : progress);
+            
+            // Calculate new frame position
+            currentFrame = (int)(progress * (animationFrames.size() - 1));
+            
+            // Ensure currentFrame is within valid range
+            currentFrame = currentFrame < 0 ? 0 : 
+                         (currentFrame >= animationFrames.size() ? 
+                          animationFrames.size() - 1 : currentFrame);
+            
+            // Update current state from stored animation frame
+            if (currentFrame < animationFrames.size()) {
+                edges = animationFrames[currentFrame];
+                parent = parentFrames[currentFrame];
+                
+                // NEW: Restore vertex positions from saved frame
+                if (currentFrame < vertexPositionFrames.size()) {
+                    vertexPositions = vertexPositionFrames[currentFrame];
+                }
+                
+                // Update edge positions to match restored vertex positions
+                for (auto &edge : edges) {
+                    edge.posU = vertexPositions[edge.u];
+                    edge.posV = vertexPositions[edge.v];
+                }
+                
+                if (highlightFrames[currentFrame].first != -1) {
+                    highlightVertex1 = highlightFrames[currentFrame].first;
+                    highlightVertex2 = highlightFrames[currentFrame].second;
+                } else {
+                    highlightVertex1 = highlightVertex2 = -1;
+                }
+                
+                // FIXED: Update the highlighted pseudocode line from the stored frame
+                if (currentFrame < pseudoCodeHighlightFrames.size()) {
+                    currentHighlightedLine = pseudoCodeHighlightFrames[currentFrame];
+                }
+            }
+            
+            // Pause animation while scrubbing
+            isPaused = true;
+            isPlayingAnimation = false;
+        } else {
+            // Release drag when mouse button is released
+            isDraggingProgressBar = false;
+        }
+    }
+    
+    // Handle automatic animation playback
+    if (isPlayingAnimation && !isPaused) {
+        currentFrame += frameSkip;
+        if (currentFrame >= animationFrames.size()) {
+            currentFrame = animationFrames.size() - 1;
+            isPlayingAnimation = false;
+        }
+        
+        // Update current state from stored animation frame
+        if (currentFrame < animationFrames.size()) {
+            edges = animationFrames[currentFrame];
+            parent = parentFrames[currentFrame];
+            
+            // NEW: Restore vertex positions from saved frame
+            if (currentFrame < vertexPositionFrames.size()) {
+                vertexPositions = vertexPositionFrames[currentFrame];
+            }
+            
+            // Update edge positions based on current vertex positions
+            for (auto &edge : edges) {
+                edge.posU = vertexPositions[edge.u];
+                edge.posV = vertexPositions[edge.v];
+            }
+            
+            if (highlightFrames[currentFrame].first != -1) {
+                highlightVertex1 = highlightFrames[currentFrame].first;
+                highlightVertex2 = highlightFrames[currentFrame].second;
+            } else {
+                highlightVertex1 = highlightVertex2 = -1;
+            }
+            
+            // FIXED: Update the highlighted pseudocode line from the stored frame
+            if (currentFrame < pseudoCodeHighlightFrames.size()) {
+                currentHighlightedLine = pseudoCodeHighlightFrames[currentFrame];
+            }
+        }
+    }
+}
+
+// Helper function for distance calculation
+float MST::euclideanDistance(Vector2 a, Vector2 b) {
+    float dx = a.x - b.x;
+    float dy = a.y - b.y;
+    return sqrt(dx*dx + dy*dy);
+}
+
+// Modify the handleMouseInteraction method to add bounds checking
+void MST::handleMouseInteraction() {
+    Vector2 mousePos = GetMousePosition();
+    
+    // Check if vertexPositions is properly initialized
+    if (vertexPositions.size() <= n) {
+        // If not initialized, initialize now
+        initializeVertexPositions();
+        return;
+    }
+    
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        for (int i = 1; i <= n; i++) {
+            // Safe access with bounds check
+            if (i < vertexPositions.size() && 
+                euclideanDistance(mousePos, vertexPositions[i]) <= vertexRadius * 1.5f) {
+                selectedVertex = i;
+                break;
+            }
+        }
+    }
+    
+    if (selectedVertex != -1 && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+        // Safe access with bounds check
+        if (selectedVertex < vertexPositions.size()) {
+            vertexPositions[selectedVertex] = mousePos;
+            
+            // Make sure velocities vector is also properly sized
+            if (selectedVertex < velocities.size()) {
+                velocities[selectedVertex] = {0, 0};
+            }
+            
+            // Update positions of edges connected to this vertex
+            for (auto &edge : edges) {
+                if (edge.u == selectedVertex) {
+                    edge.posU = mousePos;
+                }
+                if (edge.v == selectedVertex) {
+                    edge.posV = mousePos;
+                }
+            }
+        }
+    }
+    
+    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+        selectedVertex = -1;
+    }
+}
+
+// Update vertex positions using force-directed layout algorithm - modified for fixed position mode
+void MST::updateInteractiveGraph(int screenWidth, int screenHeight) {
+    // Handle mouse interactions first
+    handleMouseInteraction();
+    
+    // Skip physics calculations in fixed position mode
+    if (fixedPositionMode) {
+        // Still update edge positions to match vertex positions
+        for (auto &edge : edges) {
+            edge.posU = vertexPositions[edge.u];
+            edge.posV = vertexPositions[edge.v];
+        }
+        return;
+    }
+    
+    // Calculate physics for all vertices when in physics mode
+    for (int iter = 0; iter < physicsIterations; iter++) {
+        std::vector<Vector2> forces(n + 1, {0, 0});
+        
+        // Calculate repulsive forces between all vertices
+        for (int i = 1; i <= n; i++) {
+            for (int j = i + 1; j <= n; j++) {
+                Vector2 delta = {
+                    vertexPositions[i].x - vertexPositions[j].x,
+                    vertexPositions[i].y - vertexPositions[j].y
+                };
+                
+                float dist = euclideanDistance(vertexPositions[i], vertexPositions[j]);
+                if (dist < 0.1f) dist = 0.1f;
+                
+                float repForce = C_rep / (dist * dist);
+                Vector2 dir = {delta.x / dist, delta.y / dist};
+                Vector2 forceRep = {dir.x * repForce, dir.y * repForce};
+                
+                forces[i].x += forceRep.x;
+                forces[i].y += forceRep.y;
+                forces[j].x -= forceRep.x;
+                forces[j].y -= forceRep.y;
+            }
+        }
+        
+        // Calculate attractive forces along edges
+        for (const auto &edge : edges) {
+            int u = edge.u;
+            int v = edge.v;
+            
+            Vector2 delta = {
+                vertexPositions[u].x - vertexPositions[v].x,
+                vertexPositions[u].y - vertexPositions[v].y
+            };
+            
+            float dist = euclideanDistance(vertexPositions[u], vertexPositions[v]);
+            if (dist < 0.1f) dist = 0.1f;
+            
+            float displacement = dist - L;
+            float attractiveForce = c_spring * displacement;
+            Vector2 dir = {delta.x / dist, delta.y / dist};
+            Vector2 forceAtt = {dir.x * attractiveForce, dir.y * attractiveForce};
+            
+            forces[u].x -= forceAtt.x;
+            forces[u].y -= forceAtt.y;
+            forces[v].x += forceAtt.x;
+            forces[v].y += forceAtt.y;
+        }
+        
+        // Apply forces to update velocities and positions
+        for (int i = 1; i <= n; i++) {
+            // Skip physics update only for the vertex being dragged
+            if (i == selectedVertex) continue;
+            
+            // Update velocity with force and damping
+            velocities[i].x = (velocities[i].x + forces[i].x * timeStep) * damping;
+            velocities[i].y = (velocities[i].y + forces[i].y * timeStep) * damping;
+            
+            // Update position
+            vertexPositions[i].x += velocities[i].x * timeStep;
+            vertexPositions[i].y += velocities[i].y * timeStep;
+            
+            // Constrain to screen boundaries
+            if (vertexPositions[i].x < vertexRadius)
+                vertexPositions[i].x = vertexRadius;
+            if (vertexPositions[i].y < vertexRadius)
+                vertexPositions[i].y = vertexRadius;
+            if (vertexPositions[i].x > screenWidth - vertexRadius)
+                vertexPositions[i].x = screenWidth - vertexRadius;
+            if (vertexPositions[i].y > screenHeight - vertexRadius)
+                vertexPositions[i].y = screenHeight - vertexRadius;
+        }
+            
+        // Update edge positions after all vertex positions are updated
+        for (auto &edge : edges) {
+            edge.posU = vertexPositions[edge.u];
+            edge.posV = vertexPositions[edge.v];
+        }
+    }
+}
+
+// Replace the existing updateVertexPositions with our new interactive version
+void MST::updateVertexPositions() {
+    // Handle mode toggle interaction regardless of animation state
+    handleModeToggleInteraction();
+    
+    // Handle pseudocode toggle button interaction
+    handlePseudoCodeToggle();
+    
+    updateInteractiveGraph(1920, 1080); // Use screen dimensions
+    
+    // Handle progress bar interaction when animation frames are available
+    if (!animationFrames.empty()) {
+        handleProgressBarInteraction();
+    }
+}
+
+void MST::initializeVertexPositions() {
+    vertexPositions.clear();
+    targetPositions.clear();
+    velocities.clear();
+    
+    int centerX = SCREEN_WIDTH /2;
+    int centerY = SCREEN_HEIGHT /3;
+    int radius = 300;
+
+    // Initialize vertex positions in a circular arrangement
+    vertexPositions.push_back({0, 0}); // Dummy vertex at index 0 (not used)
+    velocities.push_back({0, 0});
+    
+    // Place vertices directly on the circle
+    for (int i = 1; i <= n; i++) {
+        float angle = 2 * PI * (i - 1) / n;
+        Vector2 circlePos = {
+            (float)(centerX + radius * cos(angle)),
+            (float)(centerY + radius * sin(angle))
+        };
+        
+        vertexPositions.push_back(circlePos);
+        velocities.push_back({0, 0});
+        targetPositions.push_back(circlePos);
+    }
+    
+    // Update edge positions to match vertex positions
+    for (auto &edge : edges) {
+        edge.posU = vertexPositions[edge.u];
+        edge.posV = vertexPositions[edge.v];
+    }
+}
+
+// NEW: Method to toggle fixed position mode
+void MST::toggleFixedPositionMode() {
+    fixedPositionMode = !fixedPositionMode;
 }
