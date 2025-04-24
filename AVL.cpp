@@ -548,3 +548,144 @@ AVLNode* AVL::findHelper(AVLNode* node, int key) {
         return findHelper(node->left, key);
     }
 }
+
+// Add pseudocode for inorder traversal
+void AVL::setPseudoCodeInorder() {
+    currentOperation = "Inorder Traversal";
+    currentPseudoCode.clear();
+    
+    currentPseudoCode.push_back("if this is null");
+    currentPseudoCode.push_back("  return");
+    currentPseudoCode.push_back("");
+    currentPseudoCode.push_back("Inorder(left)");
+    currentPseudoCode.push_back("");
+    currentPseudoCode.push_back("visit this");
+    currentPseudoCode.push_back("");
+    currentPseudoCode.push_back("Inorder(right)");
+    
+    currentHighlightedLine = 0;
+}
+
+// Add pseudocode for preorder traversal
+void AVL::setPseudoCodePreorder() {
+    currentOperation = "Preorder Traversal";
+    currentPseudoCode.clear();
+    
+    currentPseudoCode.push_back("if this is null");
+    currentPseudoCode.push_back("  return");
+    currentPseudoCode.push_back("");
+    currentPseudoCode.push_back("visit this");
+    currentPseudoCode.push_back("");
+    currentPseudoCode.push_back("Preorder(left)");
+    currentPseudoCode.push_back("");
+    currentPseudoCode.push_back("Preorder(right)");
+    
+    currentHighlightedLine = 0;
+}
+
+// Add pseudocode for postorder traversal
+void AVL::setPseudoCodePostorder() {
+    currentOperation = "Postorder Traversal";
+    currentPseudoCode.clear();
+    
+    currentPseudoCode.push_back("if this is null");
+    currentPseudoCode.push_back("  return");
+    currentPseudoCode.push_back("");
+    currentPseudoCode.push_back("Postorder(left)");
+    currentPseudoCode.push_back("");
+    currentPseudoCode.push_back("Postorder(right)");
+    currentPseudoCode.push_back("");
+    currentPseudoCode.push_back("visit this");
+    
+    currentHighlightedLine = 0;
+}
+
+// Add pseudocode for insert operation
+void AVL::setPseudoCodeInsert(int value) {
+    currentOperation = "Insert";
+    currentPseudoCode.clear();
+    
+    char valueLine[50];
+    sprintf(valueLine, "insert %d", value);
+    
+    currentPseudoCode.push_back(valueLine);
+    currentPseudoCode.push_back("check balance factor of this and its children");
+    currentPseudoCode.push_back("");
+    currentPseudoCode.push_back("  case1: this.rotateRight");
+    currentPseudoCode.push_back("");
+    currentPseudoCode.push_back("  case2: this.left.rotateLeft, this.rotateRight");
+    currentPseudoCode.push_back("");
+    currentPseudoCode.push_back("  case3: this.rotateLeft");
+    currentPseudoCode.push_back("");
+    currentPseudoCode.push_back("  case4: this.right.rotateRight, this.rotateLeft");
+    currentPseudoCode.push_back("");
+    currentPseudoCode.push_back("  this is balanced");
+    
+    currentHighlightedLine = 0;
+}
+
+// Update highlighted line
+void AVL::updatePseudoCodeHighlight(int line) {
+    currentHighlightedLine = line;
+    
+    // Capture current state with updated highlight
+    animationStates.push_back(captureCurrentState());
+}
+
+
+// Add pseudocode for search operation
+void AVL::setPseudoCodeSearch(int value) {
+    currentOperation = "Search";
+    currentPseudoCode.clear();
+    
+    char valueLine[50];
+    sprintf(valueLine, "search %d", value);
+    
+    currentPseudoCode.push_back(valueLine);
+    currentPseudoCode.push_back("if this == null");
+    currentPseudoCode.push_back("  return null");
+    currentPseudoCode.push_back("else if this key == search value");
+    currentPseudoCode.push_back("  return this");
+    currentPseudoCode.push_back("else if this key < search value");
+    currentPseudoCode.push_back("  search right");
+    currentPseudoCode.push_back("else");
+    currentPseudoCode.push_back("  search left");
+    
+    currentHighlightedLine = 0;
+}
+
+// Add pseudocode for delete operation
+void AVL::setPseudoCodeDelete(int value) {
+    currentOperation = "Delete";
+    currentPseudoCode.clear();
+    
+    char valueLine[50];
+    sprintf(valueLine, "remove %d", value);
+    
+    currentPseudoCode.push_back(valueLine);
+    currentPseudoCode.push_back("check balance factor of this and its children");
+    currentPseudoCode.push_back("");
+    currentPseudoCode.push_back("  case1: this.rotateRight");
+    currentPseudoCode.push_back("");
+    currentPseudoCode.push_back("  case2: this.left.rotateLeft, this.rotateRight");
+    currentPseudoCode.push_back("");
+    currentPseudoCode.push_back("  case3: this.rotateLeft");
+    currentPseudoCode.push_back("");
+    currentPseudoCode.push_back("  case4: this.right.rotateRight, this.rotateLeft");
+    currentPseudoCode.push_back("");
+    currentPseudoCode.push_back("  this is balanced");
+    
+    currentHighlightedLine = 0;
+}
+
+void AVL::deleteKey(int key) {
+    // Set up pseudocode for deletion
+    setPseudoCodeDelete(key);
+    
+    // Perform deletion
+    root = deleteHelper(root, key);
+    updateTargets();
+    AnimateUntilSettled(*this, 0.5f, 10000);
+    resetColors(root);
+    addStateToHistory();
+}
