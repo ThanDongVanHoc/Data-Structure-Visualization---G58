@@ -84,6 +84,117 @@ LinkedList::~LinkedList() {
     edges.clear();
 }
 
+
+
+// Check if all nodes are settled at their target positions
+bool LinkedList::areNodesSettled() {
+    Node* curr = head;
+    while (curr) {
+        float dx = curr->targetX - curr->x;
+        float dy = curr->targetY - curr->y;
+        if (fabs(dx) > SETTLE_DISTANCE || fabs(dy) > SETTLE_DISTANCE ||
+            fabs(curr->vx) > 0.1f || fabs(curr->vy) > 0.1f) {
+            return false;
+        }
+        curr = curr->next;
+    }
+    return true;
+}
+// Hàm updateTargets() tính toán vị trí của các node sao cho danh sách được căn giữa.
+void LinkedList::updateTargets() {
+    int count = 0;
+    Node* curr = head;
+    while (curr) {
+        count++;
+        curr = curr->next;
+    }
+    if (count == 0) return;
+    
+    // Adjusted for node radius instead of width
+    float totalWidth = count * (2 * NODE_RADIUS) + (count - 1) * GAP;
+    float startX = (SCREEN_WIDTH - totalWidth) / 2.0f + NODE_RADIUS;
+    float startY = (SCREEN_HEIGHT - NODE_RADIUS) / 2.0f;
+    
+    curr = head;
+    int index = 0;
+    while (curr) {
+        curr->targetX = startX + index * (2 * NODE_RADIUS + GAP);
+        curr->targetY = startY;
+        index++;
+        curr = curr->next;
+    }
+    
+    // Rebuild edge list when targets are updated
+    updateEdges();
+}
+
+// Update edge information based on node status
+void LinkedList::updateEdges() {
+    // Don't clear existing edges, only update or add as needed
+    
+    // Find and update existing edges, or create new ones
+    Node* curr = head;
+    
+    // Track which edges have been updated
+    std::vector<bool> edgeUpdated(edges.size(), false);
+    int edgeIndex = 0;
+    
+    while (curr && curr->next) {
+        bool edgeExists = false;
+        
+        // Check if this edge already exists
+        for (size_t i = 0; i < edges.size(); i++) {
+            if (edges[i].startNode == curr && edges[i].endNode == curr->next) {
+                edgeUpdated[i] = true;
+                edgeExists = true;
+                
+                // Keep animation running if this is an edge from the last inserted node
+                if (curr == lastInsertedNode && edges[i].animationProgress < 1.0f) {
+                    edges[i].isAnimating = true;
+                }
+                
+                break;
+            }
+        }
+        
+        // If edge doesn't exist, create a new one
+        if (!edgeExists) {
+            ListEdge newEdge(curr, curr->next);
+            
+            // Only animate if this is an edge from a newly inserted node
+            if (curr == lastInsertedNode) {
+                newEdge.animationProgress = 0.0f;
+                newEdge.isAnimating = true;
+            } else {
+                // For existing nodes, edge should be fully visible
+                newEdge.animationProgress = 1.0f;
+                newEdge.isAnimating = false;
+            }
+            
+            edges.push_back(newEdge);
+        }
+        
+        curr = curr->next;
+        edgeIndex++;
+    }
+    
+    // Remove any edges that are no longer valid (e.g., after deletion)
+    for (int i = edges.size() - 1; i >= 0; i--) {
+        if (i < edgeUpdated.size() && !edgeUpdated[i]) {
+            edges.erase(edges.begin() + i);
+        }
+    }
+}
+
+// Helper to create edge with animation
+void LinkedList::createEdgeWithAnimation(Node* start, Node* end) {
+    if (start && end) {
+        ListEdge newEdge(start, end);
+        edges.push_back(newEdge);
+    }
+}
+
+
 // Hàm addHead(): tạo node mới với giá trị cho trước và update layout
 void LinkedList::addHead(int value) {
     // Set up pseudocode for this operation
