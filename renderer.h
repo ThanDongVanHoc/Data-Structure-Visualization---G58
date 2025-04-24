@@ -1,16 +1,20 @@
-// renderer.h
-#ifndef RENDERER_H
-#define RENDERER_H
+// // renderer.h
+// #ifndef RENDERER_H
+// #define RENDERER_H
 
-#include "linked_list.h"
-#include "raylib.h"
-#include <vector>
+// #include "linked_list.h"
+// #include "trie.h"
 
-struct Renderer {
-    Renderer();
-    // Linked_list
-    void renderLinkedList(LinkedList* list);
-    void renderAVL(); // Placeholder for AVL tree rendering
-};
-
-#endif // RENDERER_H
+// class Renderer
+// {
+// public:
+//     Renderer();
+//     void renderLinkedList(LinkedList *list);
+//     void renderAVL();
+//     void RenderHashTable();
+//     void RenderTrie();
+//     // void DrawTrie(Trie::Node *node, int screenWidth, int screenHeight);
+// private:
+// };
+// void DrawTrie(Trie::Node *node, int screenWidth, int screenHeight);
+// #endif // RENDERER_H
