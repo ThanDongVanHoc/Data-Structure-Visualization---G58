@@ -84,7 +84,17 @@ LinkedList::~LinkedList() {
     edges.clear();
 }
 
+void LinkedList::togglePause() {
+    isPaused = !isPaused;
+}
 
+void LinkedList::resumeAnimation() {
+    isPaused = false;
+}
+
+bool LinkedList::isAnimationPaused() const {
+    return isPaused;
+}
 
 // Check if all nodes are settled at their target positions
 bool LinkedList::areNodesSettled() {
@@ -100,6 +110,7 @@ bool LinkedList::areNodesSettled() {
     }
     return true;
 }
+
 // Hàm updateTargets() tính toán vị trí của các node sao cho danh sách được căn giữa.
 void LinkedList::updateTargets() {
     int count = 0;
@@ -578,7 +589,6 @@ void LinkedList::visualize() {
     }
 }
 
-
 // Helper function to set pseudocode for addHead operation
 void LinkedList::setPseudoCodeAddHead(int value) {
     currentOperation = "Add Head";
@@ -874,7 +884,6 @@ void LinkedList::insertAfter(int index, int value) {
     updateTargets();
 }
 
-
 // Hàm animateDeleteTraversal(): duyệt danh sách highlight dần các node từ đầu cho đến node có giá trị cần xóa
 void LinkedList::animateDeleteTraversal(int value) {
     Node* curr = head;    
@@ -1032,6 +1041,586 @@ void LinkedList::deleteValue(int value) {
 }
 
 
+// Capture current state of the linked list with simplified structure
+LinkedListFrameState LinkedList::captureCurrentState() {
+    LinkedListFrameState state;
+    std::map<Node*, int> nodeToIndex;
+    
+    // First pass: serialize all nodes with positions and colors
+    Node* curr = head;
+    int index = 0;
+    while (curr) {
+        SerializableNode node;
+        node.value = curr->value;
+        node.x = curr->x;
+        node.y = curr->y;
+        node.color = curr->color;
+        node.nextNodeIndex = -1; // Will be set in second pass
+        
+        nodeToIndex[curr] = index++;
+        state.nodes.push_back(node);
+        
+        curr = curr->next;
+    }
+    
+    // Second pass: set next indices
+    curr = head;
+    index = 0;
+    while (curr) {
+        if (curr->next && nodeToIndex.find(curr->next) != nodeToIndex.end()) {
+            state.nodes[index].nextNodeIndex = nodeToIndex[curr->next];
+        }
+        index++;
+        curr = curr->next;
+    }
+    
+    // Serialize edges
+    for (const auto& edge : edges) {
+        if (nodeToIndex.find(edge.startNode) != nodeToIndex.end() && 
+            nodeToIndex.find(edge.endNode) != nodeToIndex.end()) {
+            
+            SerializableEdge serialEdge;
+            serialEdge.startNodeIndex = nodeToIndex[edge.startNode];
+            serialEdge.endNodeIndex = nodeToIndex[edge.endNode];
+            serialEdge.animationProgress = edge.animationProgress;
+            serialEdge.isAnimating = edge.isAnimating;
+            
+            state.edges.push_back(serialEdge);
+        }
+    }
+    
+    // Add pseudocode and highlighted line information
+    state.pseudoCode = currentPseudoCode;
+    state.highlightedLine = currentHighlightedLine;
+    state.operationName = currentOperation;
+    
+    return state;
+}
+
+// Visualize a specific saved state
+void LinkedList::visualizeState(const LinkedListFrameState& state) {
+    // Draw edges first
+    for (const auto& edge : state.edges) {
+        if (edge.animationProgress > 0 && 
+            edge.startNodeIndex < state.nodes.size() && 
+            edge.endNodeIndex < state.nodes.size()) {
+            
+            const auto& startNode = state.nodes[edge.startNodeIndex];
+            const auto& endNode = state.nodes[edge.endNodeIndex];
+            
+            // Start position is right side of start node
+            float startX = startNode.x + NODE_RADIUS;
+            float startY = startNode.y;
+            
+            // End position is left side of end node
+            float endX = endNode.x - NODE_RADIUS;
+            float endY = endNode.y;
+            
+            // Leave space before the end node for arrow visibility
+            float arrowOffset = 20;
+            
+            // Calculate the effective endpoint with offset
+            float effectiveEndX = endX - arrowOffset;
+            
+            // Calculate total distance and current distance
+            float totalDistance = effectiveEndX - startX;
+            float currentDistance = totalDistance * edge.animationProgress;
+            
+            // Calculate current endpoint
+            float currentEndX = startX + currentDistance;
+            
+            // Draw the main line
+            DrawLineEx(
+                (Vector2){startX, startY},
+                (Vector2){currentEndX, startY},
+                3.0f,
+                (Color){52, 73, 94, 255} // Dark slate for edges
+            );
+            
+            // Draw arrow head
+            if (edge.animationProgress > 0.9f) {
+                // Define the three vertices of the triangle arrow head
+                Vector2 v1 = { currentEndX, startY - 10 };       // Top vertex
+                Vector2 v2 = { currentEndX, startY + 10 };       // Bottom vertex
+                Vector2 v3 = { currentEndX + 15, startY };       // Tip vertex (pointing right)
+                
+                // Draw the triangle with proper vertex ordering
+                DrawTriangle(v1, v2, v3, (Color){231, 76, 60, 255}); // Red arrow
+            }
+        }
+    }
+    
+    // Draw nodes with shadow and gradient effects
+    for (size_t i = 0; i < state.nodes.size(); i++) {
+        const auto& node = state.nodes[i];
+        
+        // Draw shadow for 3D effect
+        DrawCircle((int)node.x + SHADOW_OFFSET, (int)node.y + SHADOW_OFFSET, 
+                   NODE_RADIUS, (Color){0, 0, 0, 60});
+        
+        // Draw node with gradient
+        DrawCircleGradient(
+            (int)node.x, (int)node.y, 
+            NODE_RADIUS, 
+            node.color,
+            ColorBrightness(node.color, 0.7f)
+        );
+        
+        // Draw outline
+        DrawCircleLines((int)node.x, (int)node.y, NODE_RADIUS, NODE_BORDER_COLOR);
+        
+        // Draw node value with better positioning
+        char text[16];
+        sprintf(text, "%d", node.value);
+        int textWidth = MeasureText(text, 20);
+        DrawText(text, (int)node.x - textWidth/2, (int)node.y - 10, 20, WHITE);
+    }
+    
+    // // Draw pseudocode with highlighting if available
+    // if (!state.pseudoCode.empty()) {
+    //     int startX = 50;
+    //     int startY = 50;
+    //     int lineHeight = 30;
+        
+    //     // Draw operation name
+    //     DrawTextEx(customFont, state.operationName.c_str(), (Vector2){startX, startY - lineHeight}, 24, 1, BLACK);
+        
+    //     // Draw each line of pseudocode
+    //     for (size_t i = 0; i < state.pseudoCode.size(); i++) {
+    //         Color textColor = (i == state.highlightedLine) ? RED : BLACK;
+    //         DrawTextEx(customFont, state.pseudoCode[i].c_str(), (Vector2){startX, startY + i * lineHeight}, 20, 1, textColor);
+    //     }
+    // }
+    
+    // Create a stylish pill-shaped button with gradient and shadow
+    float buttonX = 1650;
+    float buttonY = 1000;
+    if(showPseudoCode == true) buttonY = 700;
+    float buttonWidth = 220;
+    float buttonHeight = 40;
+    
+    // Draw shadow for floating effect
+    DrawRectangleRounded(
+        (Rectangle){buttonX + 3, buttonY + 3, buttonWidth, buttonHeight},
+        0.5, 8, (Color){20, 20, 20, 50}
+    );
+    
+    // Draw main button background - gradient
+    Color startColor = showPseudoCode ? (Color){142, 68, 173, 240} : (Color){52, 152, 219, 240};
+    Color endColor = showPseudoCode ? (Color){155, 89, 182, 240} : (Color){41, 128, 185, 240};
+    
+    // Create a pill shape with two half-circles and a rectangle
+    float radius = buttonHeight / 2;
+    
+    // Left half-circle
+    DrawCircleGradient(
+        buttonX + radius, buttonY + radius,
+        radius,
+        startColor, endColor
+    );
+    
+    // Right half-circle
+    DrawCircleGradient(
+        buttonX + buttonWidth - radius, buttonY + radius,
+        radius,
+        endColor, startColor
+    );
+    
+    // Center rectangle with gradient
+    DrawRectangleGradientH(
+        buttonX + radius, buttonY,
+        buttonWidth - buttonHeight, buttonHeight,
+        startColor, endColor
+    );
+    
+    // Draw outline
+    DrawRing(
+        (Vector2){buttonX + radius, buttonY + radius}, 
+        radius - 1, radius, 0, 180, 36, 
+        showPseudoCode ? (Color){142, 68, 173, 255} : (Color){41, 128, 185, 255}
+    );
+    DrawRing(
+        (Vector2){buttonX + buttonWidth - radius, buttonY + radius}, 
+        radius - 1, radius, 180, 360, 36, 
+        showPseudoCode ? (Color){142, 68, 173, 255} : (Color){41, 128, 185, 255}
+    );
+    DrawRectangle(
+        buttonX + radius, buttonY - 1,
+        buttonWidth - buttonHeight, 2,
+        showPseudoCode ? (Color){142, 68, 173, 255} : (Color){41, 128, 185, 255}
+    );
+    DrawRectangle(
+        buttonX + radius, buttonY + buttonHeight - 1,
+        buttonWidth - buttonHeight, 2,
+        showPseudoCode ? (Color){142, 68, 173, 255} : (Color){41, 128, 185, 255}
+    );
+    
+    // Draw icon instead of text
+    if (showPseudoCode) {
+        // Eye icon with slash (hide)
+        DrawCircleLines(buttonX + 50, buttonY + radius, 10, WHITE);
+        DrawLine(buttonX + 38, buttonY + radius - 12, buttonX + 62, buttonY + radius + 12, WHITE);
+    } else {
+        // Eye icon (show)
+        DrawCircleLines(buttonX + 50, buttonY + radius, 10, WHITE);
+        DrawCircle(buttonX + 50, buttonY + radius, 4, WHITE);
+    }
+    
+    // Draw text with shadow effect for depth
+    const char* buttonText = showPseudoCode ? "Hide Algorithm" : "Show Algorithm";
+    DrawText(buttonText, buttonX + 80 + 1, buttonY + 13 + 1, 18, (Color){0, 0, 0, 120});
+    DrawText(buttonText, buttonX + 80, buttonY + 13, 18, WHITE);
+    
+    // Only draw pseudocode if toggle is on
+    if (showPseudoCode && !currentPseudoCode.empty()) {
+        int startX = 1400;
+        int startY = 800;
+        int lineHeight = 30;
+        int paddingX = 20;
+        int paddingY = 15;
+        
+        // Calculate box dimensions based on content
+        int boxWidth = 0;
+        for (const auto& line : currentPseudoCode) {
+            int width = MeasureText(line.c_str(), 20) + 2 * paddingX;
+            boxWidth = std::max(boxWidth, width);
+        }
+        
+        // Make sure the box is wide enough for the title too
+        int titleWidth = MeasureText(currentOperation.c_str(), 24) + 2 * paddingX;
+        boxWidth = std::max(boxWidth, titleWidth);
+        
+        int boxHeight = currentPseudoCode.size() * lineHeight + 2 * paddingY + lineHeight; // Extra line for title
+        
+        // Draw background box with drop shadow
+        DrawRectangle(startX - paddingX + 5, startY - lineHeight - paddingY + 5, 
+                     boxWidth, boxHeight, (Color){40, 40, 40, 100}); // Shadow
+        
+        DrawRectangleRounded(
+            (Rectangle){startX - paddingX, startY - lineHeight - paddingY, boxWidth, boxHeight}, 
+            0.1, 8, (Color){240, 240, 240, 240}
+        );
+        
+        DrawRectangleRoundedLines(
+            (Rectangle){startX - paddingX, startY - lineHeight - paddingY, boxWidth, boxHeight}, 
+            0.1, 8, (Color){100, 100, 100, 200}
+        );
+        
+        // Draw operation name (title)
+        DrawTextEx(customFont, currentOperation.c_str(), (Vector2){startX, startY - lineHeight}, 24, 1, BLACK);
+        
+        // Draw each line of pseudocode
+        for (size_t i = 0; i < currentPseudoCode.size(); i++) {
+            Color textColor = (i == currentHighlightedLine) ? RED : BLACK;
+            DrawTextEx(customFont, currentPseudoCode[i].c_str(), (Vector2){startX, startY + i * lineHeight}, 20, 1, textColor);
+        }
+    }
+}
+
+// Process the entire animation for a query and store states
+std::vector<LinkedListFrameState> LinkedList::processQueryAnimation() {
+    std::vector<LinkedListFrameState> states;
+    
+    // Keep updating animation until it's complete
+    while (!isAnimationComplete()) {
+        updateAnimation();
+        states.push_back(captureCurrentState());
+    }
+    if(currentOperation == "Add Head"){
+        currentHighlightedLine = 2; // Highlight the last line of pseudocode
+        // std::cout << "ok here" << '\n';
+        states.push_back(captureCurrentState());
+    }else if(currentOperation == "Add Tail"){
+        currentHighlightedLine = 2; // Highlight the last line of pseudocode
+        // std::cout << "ok here" << '\n';
+        states.push_back(captureCurrentState());
+    }else if(currentOperation == "Insert After"){
+        currentHighlightedLine = 6;
+        states.push_back(captureCurrentState());
+    }else if(currentOperation == "Search Value"){
+        currentHighlightedLine = 4;
+        states.push_back(captureCurrentState());
+        // No pseudocode highlighting for search as per request
+        states.push_back(captureCurrentState());
+    }else if(currentOperation == "Remove At Index"){
+        // No pseudocode highlighting for remove as per request
+        currentHighlightedLine = 5;
+        states.push_back(captureCurrentState());
+    }
+    else if(currentOperation == "Delete Node"){
+        currentHighlightedLine = 6; // Highlight the last line of pseudocode
+        states.push_back(captureCurrentState());
+    }
+    // Add the final state to history for undo/redo
+    addStateToHistory();
+    
+    return states;
+}
+
+// Hàm searchValue(): duyệt danh sách và highlight dần các node từ đầu đến node có giá trị cần tìm
+void LinkedList::searchValue(int value) {
+    // Set the current operation name
+    currentOperation = "Search Value";
+
+    
+    Node* curr = head;
+    
+    // Clear any previous animation states
+    animationStates.clear();
+    
+    // First capture the initial state before any highlighting
+    currentHighlightedLine = 0;
+    for(int i = 0; i < 30; i++)
+        animationStates.push_back(captureCurrentState());
+    currentHighlightedLine = 1;
+    for(int i = 0; i < 60; i++){
+        animationStates.push_back(captureCurrentState());
+    }
+    bool found = false;
+    int position = 0;
+    
+    
+    while (curr) {
+        // Save original color
+        Color original = curr->color;
+        
+        // Highlight current node
+        curr->color = HIGHLIGHT_COLOR;
+        
+        // // Capture the state with this node highlighted
+        // animationStates.push_back(captureCurrentState());
+        
+        // // Add multiple frames to create a pause effect
+        // for (int i = 0; i < 60; i++) {
+        //     animationStates.push_back(captureCurrentState());
+        // }
+        
+        // Check if this is the node we're looking for
+        if (curr->value == value) {
+            // Extra highlight for target node with more visible color
+            curr->color = GREEN; // Use green for found node
+            
+            // Set found flag
+            found = true;
+            currentHighlightedLine = 4;
+            
+            // Capture the state with the node highlighted in green
+            for(int i = 0; i < 60; i++)
+                animationStates.push_back(captureCurrentState());
+            animationStates.push_back(captureCurrentState());
+            
+            // Add more frames for emphasis on the found node
+            for (int i = 0; i < 120; i++) {
+                animationStates.push_back(captureCurrentState());
+            }
+            
+            break;
+        }
+        currentHighlightedLine = 2;
+        for(int i = 0; i < 60; i++){
+            animationStates.push_back(captureCurrentState());
+        }
+        
+        // Reset to original color before moving to next node
+        curr->color = original;
+        currentHighlightedLine = 3;
+        for(int i = 0; i < 60; i++){
+            animationStates.push_back(captureCurrentState());
+        }
+        //animationStates.push_back(captureCurrentState());
+        
+        curr = curr->next;
+        position++;
+    }
+    currentHighlightedLine = 4;
+    // If value was not found, show some indication
+    if (!found) {
+        // Add frames showing "not found" state
+        for (int i = 0; i < 60; i++) {
+            animationStates.push_back(captureCurrentState());
+        }
+    }
+    
+    // Add a few final frames showing the end state
+    for (int i = 0; i < 60; i++) {
+        animationStates.push_back(captureCurrentState());
+    }
+    curr = head;
+    while(curr){
+        curr->color = NODE_DEFAULT_COLOR;
+        curr = curr->next; 
+    }
+}
+
+// Hàm removeAtIndex(): duyệt danh sách và highlight dần các node từ đầu cho đến node tại vị trí index và xóa node đó
+void LinkedList::removeAtIndexTraversal(int index) {
+    // Set the current operation name
+    currentOperation = "Remove At Index";
+    
+    // Set up empty pseudocode (as requested by the user)
+    //currentPseudoCode.clear();
+    //currentHighlightedLine = -1;
+    
+    // First animate the traversal to the node at the specified index
+    Node* curr = head;
+    int position = 0;
+    
+    // Clear any previous animation states
+    animationStates.clear();
+    
+    
+    // First capture the initial state before any highlighting
+    currentHighlightedLine = 0;
+    for(int i = 0; i < 60; i++)
+        animationStates.push_back(captureCurrentState());
+    currentHighlightedLine = 1;
+    for(int i = 0; i < 60; i++)
+        animationStates.push_back(captureCurrentState());
+    // If index is 0, we're deleting the head
+    if (index == 0) {
+        if (head) {
+            // Highlight head node to be deleted
+            head->color = DELETE_HIGHLIGHT_COLOR;
+            
+            // Capture the state with head highlighted
+            //animationStates.push_back(captureCurrentState());
+            currentHighlightedLine = 4;
+            // Add frames for emphasis
+            for (int i = 0; i < 60; i++) {
+                animationStates.push_back(captureCurrentState());
+            }
+            
+            // // Actually delete the head
+            // Node* temp = head;
+            // head = head->next;
+            // delete temp;
+            
+            // Update layout after deletion
+            //updateTargets();
+            
+            // Return for head deletion case
+            currentHighlightedLine = 5;
+            return;
+        }
+    }
+    
+    // Find the node before the one to be deleted
+    while (curr && position < index-1) {
+        // Save original color
+        Color original = curr->color;
+        
+        // Highlight current node
+        curr->color = HIGHLIGHT_COLOR;
+        
+        // Capture the state with this node highlighted
+        currentHighlightedLine = 2;
+        for(int i = 0; i < 60; i++)
+            animationStates.push_back(captureCurrentState());
+        
+        // // Add pause effect
+        // for (int i = 0; i < 30; i++) {
+        //     animationStates.push_back(captureCurrentState());
+        // }
+        
+        // Reset to original color before moving to next node
+        curr->color = original;
+        //animationStates.push_back(captureCurrentState());
+        
+        currentHighlightedLine = 3;
+        for(int i = 0; i < 60; i++){
+            animationStates.push_back(captureCurrentState());
+        }
+        curr = curr->next;
+        position++;
+    }
+    
+    // If we found the node before the target position
+    if (curr && curr->next) {
+        // Highlight current node (node before the one to delete)
+        curr->color = HIGHLIGHT_COLOR;
+        animationStates.push_back(captureCurrentState());
+        currentHighlightedLine = 4;
+        for (int i = 0; i < 60; i++) {
+            animationStates.push_back(captureCurrentState());
+        }
+        currentHighlightedLine = 4;
+        for(int i = 0; i < 60; i++) {
+            animationStates.push_back(captureCurrentState());
+        }
+        // Highlight the node to be deleted
+        curr->next->color = DELETE_HIGHLIGHT_COLOR;
+        animationStates.push_back(captureCurrentState());
+        currentHighlightedLine = 4;
+        for (int i = 0; i < 60; i++) {
+            animationStates.push_back(captureCurrentState());
+        }
+
+        
+        // Actually delete the node
+        // Node* temp = curr->next;
+        // curr->next = temp->next;
+        // delete temp;
+        
+        // Reset current node color
+        curr->color = NODE_DEFAULT_COLOR;
+        
+        // Update layout after deletion
+        updateTargets();
+    } else {
+        // Index out of range, show some indication
+        for (int i = 0; i < 60; i++) {
+            animationStates.push_back(captureCurrentState());
+        }
+    }
+    currentHighlightedLine = 5;
+}
+
+// Hàm removeAtIndex(): duyệt danh sách và highlight dần các node từ đầu cho đến node tại vị trí index và xóa node đó
+void LinkedList::removeAtIndex(int index) {
+    // Set the current operation name
+    currentOperation = "Remove At Index";
+    // First animate the traversal to the node at the specified index
+    Node* curr = head;
+    int position = 0;
+    
+    // Clear any previous animation states
+    
+    // If index is 0, we're deleting the head
+    if (index == 0) {
+        if (head) {
+            Node* temp = head;
+            head = head->next;
+            
+            delete temp;
+            
+            // Update layout after deletion
+            updateTargets();
+            return;
+        }
+    }
+    
+    // Find the node before the one to be deleted
+    while (curr && position < index-1) {
+        
+        curr = curr->next;
+        position++;
+    }
+    
+    // If we found the node before the target position
+    if (curr && curr->next) {
+        currentHighlightedLine = 5;
+        // Actually delete the node
+        Node* temp = curr->next;
+        curr->next = temp->next;
+        delete temp;
+        
+        // Reset current node color
+        curr->color = NODE_DEFAULT_COLOR;
+        
+        // Update layout after deletion
+        updateTargets();
+    }
+}
 
 // Clear animation states
 void LinkedList::clearAnimationStates() {
@@ -1186,4 +1775,114 @@ const LinkedListFrameState& LinkedList::getCurrentHistoryState() const {
     return historyStates[currentHistoryPosition];
 }
 
+void LinkedList::clearLinkedList(){
+    if(head == nullptr) return;
+    Node * curr = head;
+    while(curr){
+        Node * temp = curr;
+        curr = curr -> next;
+        delete temp;
+    }
+    delete curr;
+}
+
+void LinkedList::createEmpty() {
+    // Clear existing list
+    while (head) {
+        Node* temp = head;
+        head = head->next;
+        delete temp;
+    }
+    edges.clear();
+    lastInsertedNode = nullptr;
+    TailNode = nullptr;
+    
+    updateTargets();
+    addStateToHistory();
+}
+
+void LinkedList::createRandom(int size) {
+    createEmpty();
+    
+    // Calculate initial positions
+    float startX = (SCREEN_WIDTH - (size-1)*GAP - NODE_RADIUS) / 2.0f;
+    float startY = (SCREEN_HEIGHT - NODE_RADIUS) / 2.0f;
+
+    // Generate random numbers and add to list
+    for(int i = 0; i < size; i++) {
+        int value = GetRandomValue(1, 100);
+        Node* newNode = new Node(value);
+        
+        // Set position directly to target
+        newNode->x = startX + i * (2 * NODE_RADIUS + GAP);
+        newNode->y = startY;
+        newNode->targetX = newNode->x;
+        newNode->targetY = newNode->y;
+        newNode->vx = 0;
+        newNode->vy = 0;
+
+        // Add to list
+        if (!head) {
+            head = newNode;
+        } else {
+            Node* curr = head;
+            while (curr->next) curr = curr->next;
+            curr->next = newNode;
+            
+            // Create edge with completed animation
+            ListEdge edge(curr, newNode);
+            edge.animationProgress = 1.0f;
+            edge.isAnimating = false;
+            edges.push_back(edge);
+        }
+    }
+
+    addStateToHistory();
+}
+
+void LinkedList::createRandomSorted(int size) {
+    createEmpty();
+    
+    // Calculate initial positions
+    float startX = (SCREEN_WIDTH - (size-1)*GAP - NODE_RADIUS) / 2.0f;
+    float startY = (SCREEN_HEIGHT - NODE_RADIUS) / 2.0f;
+    
+    // Generate sorted numbers
+    std::vector<int> numbers;
+    int current = 1;
+    for(int i = 0; i < size; i++) {
+        current += GetRandomValue(1, 5);
+        numbers.push_back(current);
+    }
+
+    // Add numbers to list with direct positioning
+    for(int i = 0; i < size; i++) {
+        Node* newNode = new Node(numbers[i]);
+        
+        // Set position directly to target
+        newNode->x = startX + i * (2 * NODE_RADIUS + GAP);
+        newNode->y = startY;
+        newNode->targetX = newNode->x;
+        newNode->targetY = newNode->y;
+        newNode->vx = 0;
+        newNode->vy = 0;
+
+        // Add to list
+        if (!head) {
+            head = newNode;
+        } else {
+            Node* curr = head;
+            while (curr->next) curr = curr->next;
+            curr->next = newNode;
+            
+            // Create edge with completed animation
+            ListEdge edge(curr, newNode);
+            edge.animationProgress = 1.0f;
+            edge.isAnimating = false;
+            edges.push_back(edge);
+        }
+    }
+
+    addStateToHistory();
+}
 
