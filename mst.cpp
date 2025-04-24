@@ -86,7 +86,25 @@ MST::MST(int n, int m) : n(n), m(m) {
     showPseudoCode = false; // NEW: Start with pseudocode hidden
 }
 
-
+void MST::addEdge(int u, int v, int w) {
+    Edge e;
+    e.u = u; e.v = v; e.w = w;
+    e.color = DARKGRAY; // Thay đổi màu mặc định sang DARKGRAY
+    // Tính vị trí đỉnh cho đồ thị (đặt các đỉnh trên vòng tròn ở nửa bên phải).
+    int centerX = SCREEN_WIDTH * 3 / 4;
+    int centerY = SCREEN_HEIGHT / 2;
+    int radius = 300;
+    float angleU = 2 * PI * (u - 1) / n;
+    float angleV = 2 * PI * (v - 1) / n;
+    e.posU = { centerX + radius * cos(angleU), centerY + radius * sin(angleU) };
+    e.posV = { centerX + radius * cos(angleV), centerY + radius * sin(angleV) };
+    
+    // Place new edges off-screen initially
+    e.currentPos = { (float)EDGE_LIST_START_X, SCREEN_HEIGHT + 100.0f };
+    e.targetPos = e.currentPos; // Initially target position is the same as current
+    
+    edges.push_back(e);
+}
 
 void MST::sortEdges() {
     std::sort(edges.begin(), edges.end(), [](const Edge &a, const Edge &b) {
@@ -125,6 +143,7 @@ void MST::unionVertices(int u, int v) {
     int pv = findParent(v);
     parent[pu] = pv;
 }
+
 Color MST::interpolateColor(Color start, Color end, float t) {
     Color result;
     result.r = start.r + (int)((end.r - start.r) * t);
@@ -141,7 +160,6 @@ void MST::animateEdgeColor(Edge &e, Color start, Color end, int durationMs) {
         e.color = interpolateColor(start, end, t);
     }
 }
-
 
 // ADDED: Set pseudocode for Kruskal's algorithm
 void MST::setPseudoCodeKruskal() {
@@ -326,7 +344,146 @@ void MST::handlePseudoCodeToggle() {
     }
 }
 
+// ADDED: Step backward to previous highlighted line
+void MST::stepBackward() {
+    if (!pseudoCodeHighlightFrames.empty() && currentFrame > 0) {
+        fixedPositionMode = true;
+        // Get current highlighted line
+        int currentHighlightedLine = pseudoCodeHighlightFrames[currentFrame];
+        
+        // First find the previous different highlighted line
+        int previousLine = -1;
+        int targetStep = currentFrame;
+        
+        while (targetStep >= 0) {
+            if (pseudoCodeHighlightFrames[targetStep] != currentHighlightedLine) {
+                previousLine = pseudoCodeHighlightFrames[targetStep];
+                break;
+            }
+            targetStep--;
+        }
+        
+        // Jump to the last frame of the previous line
+        currentFrame = std::max(0, targetStep);
+        
+        // Temporarily force fixed position mode to prevent physics effects
+        bool wasFixedMode = fixedPositionMode;
+        fixedPositionMode = true;
+        
+        // Update current state from stored animation frame
+        if (currentFrame < animationFrames.size()) {
+            edges = animationFrames[currentFrame];
+            parent = parentFrames[currentFrame];
+            
+            if (currentFrame < vertexPositionFrames.size()) {
+                // Set vertex positions directly without animation/physics
+                vertexPositions = vertexPositionFrames[currentFrame];
+                
+                // Reset all velocities to zero to prevent bounce effect
+                for (int i = 0; i < velocities.size(); i++) {
+                    velocities[i] = {0, 0};
+                }
+            }
+            
+            // Update edge positions to exactly match vertex positions
+            for (auto &edge : edges) {
+                edge.posU = vertexPositions[edge.u];
+                edge.posV = vertexPositions[edge.v];
+            }
+            
+            if (highlightFrames[currentFrame].first != -1) {
+                highlightVertex1 = highlightFrames[currentFrame].first;
+                highlightVertex2 = highlightFrames[currentFrame].second;
+            } else {
+                highlightVertex1 = highlightVertex2 = -1;
+            }
+            
+            // Update current highlighted line
+            this->currentHighlightedLine = pseudoCodeHighlightFrames[currentFrame];
+        }
+        
+        isPaused = true; // Pause playback when stepping manually
+        
+        // Optional: Restore the original mode setting after a short delay
+        // For now, we'll keep it in fixed mode to prevent physics from taking over
+        // fixedPositionMode = wasFixedMode;
+    }
 
+}
+
+// ADDED: Step forward to next highlighted line
+void MST::stepForward() {
+    
+    if (!pseudoCodeHighlightFrames.empty() && currentFrame < pseudoCodeHighlightFrames.size() - 1) {
+        fixedPositionMode = true;
+        // Get current highlighted line
+
+        int currentHighlightedLine = pseudoCodeHighlightFrames[currentFrame];
+        
+        // First find the next different highlighted line
+        int nextLine = -1;
+        int firstFrameOfNextLine = -1;
+        int targetStep = currentFrame;
+        
+        // Find the first occurrence of a different highlighted line
+        while (targetStep < pseudoCodeHighlightFrames.size()) {
+            if (pseudoCodeHighlightFrames[targetStep] != currentHighlightedLine) {
+                nextLine = pseudoCodeHighlightFrames[targetStep];
+                firstFrameOfNextLine = targetStep;
+                break;
+            }
+            targetStep++;
+        }
+        
+        if (nextLine != -1) {
+            // Now find the last frame with this new highlighted line
+            int lastFrameOfNextLine = firstFrameOfNextLine;
+            targetStep = firstFrameOfNextLine;
+            
+            while (targetStep < pseudoCodeHighlightFrames.size()) {
+                if (pseudoCodeHighlightFrames[targetStep] == nextLine) {
+                    lastFrameOfNextLine = targetStep;
+                } else {
+                    // Found a different highlight, stop here
+                    break;
+                }
+                targetStep++;
+            }
+            
+            // Jump to the last frame of the next line
+            currentFrame = lastFrameOfNextLine;
+        } else {
+            // If no next line, go to the last frame
+            currentFrame = pseudoCodeHighlightFrames.size() - 1;
+        }
+        
+        // Temporarily force fixed position mode to prevent physics effects
+        bool wasFixedMode = fixedPositionMode;
+        fixedPositionMode = true;
+        
+        // Update current state from stored animation frame
+        if (currentFrame < animationFrames.size()) {
+            edges = animationFrames[currentFrame];
+            // Update edge positions to exactly match vertex positions
+            for (auto &edge : edges) {
+                edge.posU = vertexPositions[edge.u];
+                edge.posV = vertexPositions[edge.v];
+            }
+            
+            if (highlightFrames[currentFrame].first != -1) {
+                highlightVertex1 = highlightFrames[currentFrame].first;
+                highlightVertex2 = highlightFrames[currentFrame].second;
+            } else {
+                highlightVertex1 = highlightVertex2 = -1;
+            }
+            
+            // Update current highlighted line
+            this->currentHighlightedLine = pseudoCodeHighlightFrames[currentFrame];
+        }
+        
+        isPaused = true; // Pause playback when stepping manually
+    }
+}
 
 void MST::runKruskal() {
     // Initialize pseudocode
@@ -524,7 +681,6 @@ void MST::runKruskal() {
     }
 }
 
-////////////////////
 ///////////////////////////////////////////////////////////
 // Visualization methods
 
@@ -673,7 +829,6 @@ void MST::drawGraph() {
         DrawText(s.c_str(), pos.x - textWidth/2, pos.y - 11, 22, textColor);
     }
 }
-
 
 // NEW: Draw mode toggle button separately
 void MST::drawModeToggle() {
