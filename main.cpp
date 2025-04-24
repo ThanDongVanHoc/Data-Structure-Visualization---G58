@@ -460,6 +460,1571 @@ void DrawSidebar(Rectangle sidebar)
 
 }
 
+void RunMSTVisualization() {
+    Rectangle backBtn = CreateBackButton();
+    const int screenWidth = 1920;
+    const int screenHeight = 1080;
+    
+    int numVertices = 7; // Default value
+    MST mst(numVertices, 0);
+    mst.initializeVertexPositions(); // Explicitly initialize vertex positions right at the start
+    
+    // UI constants
+    const float BUTTON_WIDTH = 140;
+    const float BUTTON_HEIGHT = 40;
+    const float CENTER_X = screenWidth / 2;
+    const float TITLE_Y = 15;
+    const float START_Y = TITLE_Y + 40;
+    
+    // Hamburger icon: góc trái dưới (padding 10 pixel)
+    Rectangle hamburgerIcon = { 10, (float)screenHeight - 100, 40, 40 };
+    bool isMenuOpen = false;
+
+    // Sidebar: toàn bộ chiều cao, chiều rộng 300 pixel (bên trái)
+    Rectangle sidebar = { 20 , 400, 350, (float)screenHeight };
+    
+    // Buttons
+    //Rectangle runMSTButton = { CENTER_X - BUTTON_WIDTH/2, START_Y + 15, BUTTON_WIDTH, BUTTON_HEIGHT };
+    Rectangle runMSTButton = { sidebar.x + 50, 500, 260, 40 };
+
+    //Rectangle randomButton = { CENTER_X + 350, START_Y + 15, BUTTON_WIDTH, BUTTON_HEIGHT };
+    Rectangle randomButton  = { sidebar.x + 50, runMSTButton.y + runMSTButton.height + 20, 130, 40 };
+
+    // Scrollable input container
+    //Rectangle vertexInputBox = { CENTER_X - 100, START_Y - 10, 80, 30 };   
+    Rectangle vertexInputBox = { sidebar.x + 50, randomButton.y + randomButton.height + 20, 130, 40 };
+    Rectangle fileButton = { vertexInputBox.x + vertexInputBox.width + 10, vertexInputBox.y, 120 , 40 };
+
+    //Rectangle inputContainer = { CENTER_X - 300, START_Y + BUTTON_HEIGHT + 30, 600, 350 };
+    
+    Rectangle inputContainer  = { sidebar.x + 50, vertexInputBox.y + vertexInputBox.height + 20, 260, 350 };
+    
+    Rectangle edgeCountBox = { randomButton.x + 130 + 10, randomButton.y, 120, 40 };
+    
+
+
+    // Scrolling variables
+    float scrollY = 0;
+    float maxScroll = 0;
+    float scrollBarHeight = 0;
+    float scrollBarPos = 0;
+    bool isDraggingScrollBar = false;
+    
+    // Input variables
+    std::string inputText = "";
+    std::string vertexCountInput = std::to_string(numVertices);
+    std::string edgeCountInput = "";
+    bool isEdgeCountTyping = false;
+    bool isVertexInputTyping = false;
+    bool isInputContainerActive = false;
+    bool isVertexInput = false; // We'll start directly with the graph input
+    
+    std::vector<std::string> inputLines = {"", "// Enter graph data, one line per entry:", "// - Single number: vertex with no connections", "// - Two numbers: edge with weight 1", "// - Three numbers: u v w for edge with weight w", ""};
+    int currentLine = inputLines.size() - 1;
+    
+    std::string errorMsg = "";
+    float errorMsgTimer = 0;
+    
+    // Add cursor position tracking for text editing
+    int cursorPosition = 0; // Position within the current line
+
+
+    GuiWindowFileDialogState fileDialogState = InitGuiWindowFileDialog(GetWorkingDirectory());
+
+    SetTargetFPS(120);
+    bool firstRun = true;
+    while (!WindowShouldClose()) {
+        Vector2 mousePoint = GetMousePosition();
+        
+        if (CheckCollisionPointRec(mousePoint, backBtn) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            return;
+        }
+        if (CheckCollisionPointRec(mousePoint, hamburgerIcon) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            isMenuOpen = !isMenuOpen;
+        }
+        
+        // Vertex count input box handling
+        if (CheckCollisionPointRec(mousePoint, vertexInputBox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            isVertexInputTyping = true;
+            isInputContainerActive = false;
+            isEdgeCountTyping = false;
+            cursorPosition = vertexCountInput.length(); // Place cursor at the end
+        }
+        
+        if (isVertexInputTyping) {
+            int key = GetCharPressed();
+            while (key > 0) {
+                if ((key >= '0' && key <= '9') && vertexCountInput.length() < 5) {
+                    // Insert character at cursor position instead of appending
+                    vertexCountInput.insert(cursorPosition, 1, (char)key);
+                    cursorPosition++; // Move cursor forward
+                }
+                key = GetCharPressed();
+            }
+            
+            // Handle backspace - only delete if cursor isn't at the beginning
+            if (IsKeyPressed(KEY_BACKSPACE) && !vertexCountInput.empty() && cursorPosition > 0) {
+                vertexCountInput.erase(cursorPosition - 1, 1);
+                cursorPosition--;
+            }
+            
+            // Handle delete key - delete character after cursor
+            if (IsKeyPressed(KEY_DELETE) && cursorPosition < vertexCountInput.length()) {
+                vertexCountInput.erase(cursorPosition, 1);
+            }
+            
+            // Handle left/right arrows for cursor movement
+            if (IsKeyPressed(KEY_LEFT) && cursorPosition > 0) {
+                cursorPosition--;
+            }
+            if (IsKeyPressed(KEY_RIGHT) && cursorPosition < vertexCountInput.length()) {
+                cursorPosition++;
+            }
+            
+            if (IsKeyPressed(KEY_ENTER)) {
+                int newVertexCount = std::stoi(vertexCountInput.empty() ? "0" : vertexCountInput);
+                if (newVertexCount >= 1) {
+                    numVertices = newVertexCount;
+                    mst = MST(numVertices, 0);
+                    mst.initializeVertexPositions();
+                    isVertexInputTyping = false;
+                } else {
+                    errorMsg = "Please enter a number between 3 and 15";
+                    errorMsgTimer = 2.0f;
+                }
+            }
+        }
+        
+        // Input container handling - enhanced with cursor positioning
+        if (CheckCollisionPointRec(mousePoint, inputContainer) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            isInputContainerActive = true;
+            isVertexInputTyping = false;
+            isEdgeCountTyping = false;
+            
+            // Calculate which line was clicked
+            float relativeY = mousePoint.y - inputContainer.y + scrollY;
+            int clickedLineIndex = (int)(relativeY / 22);
+            
+            // Make sure the clicked line is valid
+            if (clickedLineIndex >= 0 && clickedLineIndex < inputLines.size()) {
+                currentLine = clickedLineIndex;
+                
+                // Calculate cursor position within the line based on X coordinate
+                float lineStartX = inputContainer.x + 10;
+                float relativeX = mousePoint.x - lineStartX;
+                
+                // Find the closest character position based on text measurement
+                cursorPosition = 0;
+                float accumulatedWidth = 0;
+                for (size_t i = 0; i <= inputLines[currentLine].length(); i++) {
+                    float charWidth = MeasureText(
+                        (i > 0) ? inputLines[currentLine].substr(i-1, 1).c_str() : " ", 
+                        20
+                    );
+                    
+                    if (i > 0) {
+                        accumulatedWidth += charWidth;
+                    }
+                    
+                    // If we've gone past the clicked position or reached the end
+                    if (accumulatedWidth >= relativeX || i == inputLines[currentLine].length()) {
+                        cursorPosition = i;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Handle text input in the container with enhanced cursor position and clipboard
+        if (isInputContainerActive) {
+            int key = GetCharPressed();
+            while (key > 0) {
+                if ((key >= ' ' && key <= '~') && inputLines[currentLine].length() < 40) {
+                    // Insert character at cursor position
+                    inputLines[currentLine].insert(cursorPosition, 1, (char)key);
+                    cursorPosition++;
+                }
+                key = GetCharPressed();
+            }
+            
+            // Handle clipboard operations
+            bool ctrlPressed = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+            
+            // Paste from clipboard (Ctrl+V)
+            if (ctrlPressed && IsKeyPressed(KEY_V)) {
+                const char* clipText = GetClipboardText();
+                if (clipText != nullptr && clipText[0] != '\0') {
+                    std::string clipboardText = clipText;
+                    
+                    // Handle multiline paste by splitting at newlines
+                    size_t pos = 0;
+                    size_t lastPos = 0;
+                    std::string delimiter = "\n";
+                    bool isFirstLine = true;
+                    
+                    while ((pos = clipboardText.find(delimiter, lastPos)) != std::string::npos) {
+                        std::string line = clipboardText.substr(lastPos, pos - lastPos);
+                        
+                        // Remove carriage returns if present
+                        if (!line.empty() && line.back() == '\r') {
+                            line.pop_back();
+                        }
+                        
+                        if (isFirstLine) {
+                            // For first line, insert at cursor position in current line
+                            if (inputLines[currentLine].length() + line.length() <= 40) {
+                                inputLines[currentLine].insert(cursorPosition, line);
+                                cursorPosition += line.length();
+                            } else {
+                                // Truncate if too long
+                                int allowedChars = 40 - inputLines[currentLine].length();
+                                if (allowedChars > 0) {
+                                    inputLines[currentLine].insert(cursorPosition, line.substr(0, allowedChars));
+                                    cursorPosition += allowedChars;
+                                }
+                            }
+                            isFirstLine = false;
+                        } else {
+                            // For subsequent lines, insert as new lines
+                            currentLine++;
+                            inputLines.insert(inputLines.begin() + currentLine, line.substr(0, std::min(line.length(), size_t(40))));
+                            cursorPosition = std::min(line.length(), size_t(40));
+                        }
+                        
+                        lastPos = pos + delimiter.length();
+                    }
+                    
+                    // Handle the last line or single line case
+                    std::string lastLine = clipboardText.substr(lastPos);
+                    // Remove carriage returns if present
+                    if (!lastLine.empty() && lastLine.back() == '\r') {
+                        lastLine.pop_back();
+                    }
+                    
+                    if (isFirstLine) {
+                        // If this is the only line, insert at cursor
+                        if (inputLines[currentLine].length() + lastLine.length() <= 40) {
+                            inputLines[currentLine].insert(cursorPosition, lastLine);
+                            cursorPosition += lastLine.length();
+                        } else {
+                            // Truncate if too long
+                            int allowedChars = 40 - inputLines[currentLine].length();
+                            if (allowedChars > 0) {
+                                inputLines[currentLine].insert(cursorPosition, lastLine.substr(0, allowedChars));
+                                cursorPosition += allowedChars;
+                            }
+                        }
+                    } else if (!lastLine.empty()) {
+                        // If we already processed lines, add this as a new line
+                        currentLine++;
+                        inputLines.insert(inputLines.begin() + currentLine, lastLine.substr(0, std::min(lastLine.length(), size_t(40))));
+                        cursorPosition = std::min(lastLine.length(), size_t(40));
+                    }
+                    
+                    // Update max scroll after adding new lines
+                    maxScroll = std::max(0.0f, (inputLines.size() * 22) - inputContainer.height + 20);
+                    
+                    // Auto scroll to show current line
+                    float lineY = currentLine * 22;
+                    if (lineY < scrollY) {
+                        scrollY = lineY;
+                    } else if (lineY > scrollY + inputContainer.height - 22) {
+                        scrollY = lineY - inputContainer.height + 22;
+                    }
+                    scrollY = Clamp(scrollY, 0, maxScroll);
+                }
+            }
+            
+            // Copy selected text to clipboard (Ctrl+C)
+            if (ctrlPressed && IsKeyPressed(KEY_C)) {
+                if (!inputLines[currentLine].empty()) {
+                    // For now, just copy the current line
+                    SetClipboardText(inputLines[currentLine].c_str());
+                }
+            }
+            
+            // Cut selected text (Ctrl+X)
+            if (ctrlPressed && IsKeyPressed(KEY_X)) {
+                if (!inputLines[currentLine].empty()) {
+                    // Copy to clipboard then delete
+                    SetClipboardText(inputLines[currentLine].c_str());
+                    inputLines[currentLine] = "";
+                    cursorPosition = 0;
+                }
+            }
+            
+            // Select all text (Ctrl+A) - just marking for future extension
+            if (ctrlPressed && IsKeyPressed(KEY_A)) {
+                // For now, just move cursor to end of line
+                cursorPosition = inputLines[currentLine].length();
+            }
+            
+            // Handle backspace - delete character before cursor
+            if (IsKeyPressed(KEY_BACKSPACE)) {
+                if (cursorPosition > 0) {
+                    inputLines[currentLine].erase(cursorPosition - 1, 1);
+                    cursorPosition--;
+                } else if (currentLine > 0) {
+                    // If at beginning of line and not the first line, 
+                    // move to end of previous line
+                    cursorPosition = inputLines[currentLine - 1].length();
+                    inputLines[currentLine - 1] += inputLines[currentLine]; // Join lines
+                    inputLines.erase(inputLines.begin() + currentLine);
+                    currentLine--;
+                }
+            }
+            
+            // Handle delete key - delete character after cursor
+            if (IsKeyPressed(KEY_DELETE)) {
+                if (cursorPosition < inputLines[currentLine].length()) {
+                    inputLines[currentLine].erase(cursorPosition, 1);
+                } else if (currentLine < inputLines.size() - 1) {
+                    // If at end of line and not the last line, join with next line
+                    inputLines[currentLine] += inputLines[currentLine + 1];
+                    inputLines.erase(inputLines.begin() + currentLine + 1);
+                }
+            }
+            
+            // Handle left/right arrow keys for cursor movement
+            if (IsKeyPressed(KEY_LEFT)) {
+                if (cursorPosition > 0) {
+                    cursorPosition--;
+                } else if (currentLine > 0) {
+                    // Move to end of previous line
+                    currentLine--;
+                    cursorPosition = inputLines[currentLine].length();
+                }
+            }
+            if (IsKeyPressed(KEY_RIGHT)) {
+                if (cursorPosition < inputLines[currentLine].length()) {
+                    cursorPosition++;
+                } else if (currentLine < inputLines.size() - 1) {
+                    // Move to beginning of next line
+                    currentLine++;
+                    cursorPosition = 0;
+                }
+            }
+            
+            // Handle up/down arrow keys for line navigation
+            if (IsKeyPressed(KEY_UP) && currentLine > 0) {
+                currentLine--;
+                // Keep cursor at same horizontal position if possible
+                cursorPosition = std::min(cursorPosition, (int)inputLines[currentLine].length());
+            }
+            if (IsKeyPressed(KEY_DOWN) && currentLine < inputLines.size() - 1) {
+                currentLine++;
+                // Keep cursor at same horizontal position if possible
+                cursorPosition = std::min(cursorPosition, (int)inputLines[currentLine].length());
+            }
+            
+            if (IsKeyPressed(KEY_ENTER)) {
+                // Create a new line with content after the cursor
+                std::string remainder = "";
+                if (cursorPosition < inputLines[currentLine].length()) {
+                    remainder = inputLines[currentLine].substr(cursorPosition);
+                    inputLines[currentLine].erase(cursorPosition);
+                }
+                
+                // Insert the new line after the current one
+                inputLines.insert(inputLines.begin() + currentLine + 1, remainder);
+                currentLine++;
+                cursorPosition = 0;
+                
+                // Always recreate the graph from scratch with all valid lines
+                mst = MST(numVertices, 0);
+                
+                // Force fixed position mode to prevent bouncing effects
+                mst.initializeVertexPositions();
+                
+                bool validEdgesFound = false;
+                // Process all lines of input to rebuild the graph
+                for (size_t i = 0; i < inputLines.size(); i++) {
+                    if (processInputLine(inputLines[i], mst, numVertices, errorMsg)) {
+                        validEdgesFound = true;
+                    }
+                    
+                    if (!errorMsg.empty()) {
+                        errorMsg = "Error at line " + std::to_string(i+1) + ": " + errorMsg;
+                        errorMsgTimer = 2.0f;
+                        errorMsg = "";  // Clear for next iteration
+                    }
+                }
+                
+                maxScroll = std::max(0.0f, (inputLines.size() * 22) - inputContainer.height + 20);
+                // Auto scroll to show current line
+                float lineY = currentLine * 22;
+                if (lineY < scrollY) {
+                    // Line is above visible area
+                    scrollY = lineY;
+                } else if (lineY > scrollY + inputContainer.height - 22) {
+                    // Line is below visible area
+                    scrollY = lineY - inputContainer.height + 22;
+                }
+                scrollY = Clamp(scrollY, 0, maxScroll);
+            }
+            firstRun = false;
+        }
+
+
+
+        //file dialog-----------------------------------
+           // Add file load button
+           //Rectangle fileButton = { 500, 500, 200, 50 };
+        if (CheckCollisionPointRec(GetMousePosition(), fileButton)) {
+            if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                fileDialogState.windowActive = !fileDialogState.windowActive;
+            }
+        }
+    
+        // Handle file dialog
+        if (fileDialogState.windowActive) {
+            cout << "ok" << '\n';
+            GuiWindowFileDialog(&fileDialogState);
+    
+            if (fileDialogState.SelectFilePressed) {
+                std::string selectedFilePath = std::string(fileDialogState.dirPathText) + "\\" + 
+                                             std::string(fileDialogState.fileNameText);
+                
+                std::ifstream inputFile(selectedFilePath);
+                if (inputFile.is_open()) {
+                    // Clear existing input lines
+                    inputLines.clear();
+                    inputLines.push_back("");
+                    inputLines.push_back("// Loaded from file: " + std::string(fileDialogState.fileNameText));
+                    inputLines.push_back("");
+    
+                    // Read file contents
+                    std::string line;
+                    while (std::getline(inputFile, line)) {
+                        inputLines.push_back(line);
+                    }
+                    inputFile.close();
+    
+                    // Create new MST instance with loaded data
+                    mst = MST(numVertices, 0);
+                    mst.initializeVertexPositions();
+    
+                    // Process each line to build the graph
+                    std::string errorMsg;
+                    for (const auto& line : inputLines) {
+                        processInputLine(line, mst, numVertices, errorMsg);
+                        if (!errorMsg.empty()) {
+                            // Handle error if needed
+                            errorMsg = "";
+                        }
+                    }
+    
+                    // Update scroll position to see new content
+                    scrollY = 0;
+                    maxScroll = std::max(0.0f, (inputLines.size() * 22) - inputContainer.height + 20);
+                }
+    
+                fileDialogState.SelectFilePressed = false;
+            }
+        }
+
+
+        //file dialog-----------------------------------end
+        
+        // Edge count box for random graph generation
+        if (CheckCollisionPointRec(mousePoint, edgeCountBox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            isEdgeCountTyping = true;
+            isInputContainerActive = false;
+            isVertexInputTyping = false;
+            edgeCountInput = "";
+            cursorPosition = 0; // Reset cursor for edge count input
+        }
+        
+        if (isEdgeCountTyping) {
+            int key = GetCharPressed();
+            while (key > 0) {
+                if ((key >= '0' && key <= '9') && edgeCountInput.length() < 3) {
+                    // Ensure cursorPosition is valid before inserting
+                    cursorPosition = std::min(cursorPosition, (int)edgeCountInput.length());
+                    edgeCountInput.insert(cursorPosition, 1, (char)key);
+                    cursorPosition++;
+                }
+                key = GetCharPressed();
+            }
+            
+            // Handle backspace and left/right arrows for cursor movement
+            if (IsKeyPressed(KEY_BACKSPACE) && !edgeCountInput.empty() && cursorPosition > 0) {
+                edgeCountInput.erase(cursorPosition - 1, 1);
+                cursorPosition--;
+            }
+            if (IsKeyPressed(KEY_LEFT) && cursorPosition > 0) {
+                cursorPosition--;
+            }
+            if (IsKeyPressed(KEY_RIGHT) && cursorPosition < edgeCountInput.length()) {
+                cursorPosition++;
+            }
+            
+            if (IsKeyPressed(KEY_ENTER)) {
+                isEdgeCountTyping = false;
+            }
+        }
+
+        // Handle scrolling in the input container - FIXED scroll handling
+        if (CheckCollisionPointRec(mousePoint, inputContainer)) {
+            float wheel = GetMouseWheelMove();
+            if (wheel != 0) {
+                // Adjust scrolling speed
+                scrollY -= wheel * 40;
+                
+                // Limit scrolling
+                maxScroll = std::max(0.0f, (inputLines.size() * 22) - inputContainer.height + 20);
+                scrollY = Clamp(scrollY, 0, maxScroll);
+            }
+        }
+        
+        // FIX: Run MST button handling
+        if (CheckCollisionPointRec(mousePoint, runMSTButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            // Create a fresh MST instance for algorithm execution
+            // MST tempMST(numVertices, 0);
+            // tempMST.initializeVertexPositions();
+            isMenuOpen = false; // Close menu if open
+            
+            // // Process each line of input
+            // bool validEdgesFound = false;
+            // errorMsg = ""; // Clear any previous error message
+            
+            // for (size_t i = 0; i < inputLines.size(); i++) {
+            //     std::string lineErrorMsg = "";
+            //     if (processInputLine(inputLines[i], tempMST, numVertices, lineErrorMsg)) {
+            //         validEdgesFound = true;
+            //     }
+                
+            //     if (!lineErrorMsg.empty()) {
+            //         errorMsg = "Error at line " + std::to_string(i+1) + ": " + lineErrorMsg;
+            //         errorMsgTimer = 2.0f;
+            //         break; // Stop at first error
+            //     }
+            // }
+            
+            // if (validEdgesFound && errorMsg.empty()) {
+            //     // Run MST on the freshly created graph
+            //     mst = tempMST;
+            //     mst.setPseudoCodeKruskal();
+            //     mst.runKruskal();
+            //     mst.initializeVertexPositions();
+            //     mst.updateVertexPositions();
+                
+            //     // Replace the old graph with the new one
+            // } else if (!validEdgesFound) {
+            //     errorMsg = "No valid edges to run MST on";
+            //     errorMsgTimer = 2.0f;
+            // }
+            mst.setPseudoCodeKruskal();
+            mst.runKruskal();
+            //mst.initializeVertexPositions();
+            //mst.updateVertexPositions();
+        }
+        
+        // FIX: Random button handling
+        if (CheckCollisionPointRec(mousePoint, randomButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON) || firstRun == true) {
+            if (edgeCountInput.empty()  && firstRun == false) {
+                errorMsg = "Please enter number of edges first!";
+                errorMsgTimer = 2.0f;
+            } else {
+                int maxEdges = (numVertices * (numVertices - 1)) / 2;
+                int edgeCount = maxEdges - 2; 
+                if(edgeCountInput.length() > 0){
+                    edgeCount = std::stoi(edgeCountInput);
+                }
+
+                if (edgeCount > maxEdges) {
+                    errorMsg = "Max edges allowed: " + std::to_string(maxEdges);
+                    errorMsgTimer = 2.0f;
+                } else {
+                    // Create new MST with random edges
+                    mst = MST(numVertices, 0);
+                    mst.initializeVertexPositions();
+                    
+                    // Clear input lines and generate new lines for the random graph
+                    inputLines = {"", "// Random graph with " + std::to_string(edgeCount) + " edges:", ""};
+                    currentLine = inputLines.size() - 1;
+                    cursorPosition = 0;
+                    
+                    // Generate random edges
+                    std::vector<std::pair<int,int>> usedPairs;
+                    for (int i = 0; i < edgeCount; i++) {
+                        int u, v, w;
+                        bool found;
+                        do {
+                            u = GetRandomValue(1, numVertices);
+                            v = GetRandomValue(1, numVertices);
+                            found = false;
+                            if (u != v) {
+                                for (auto &p : usedPairs) {
+                                    if ((p.first == u && p.second == v) || 
+                                        (p.first == v && p.second == u)) {
+                                        found = true;
+                                        break;
+                                    }
+                                }
+                                if (!found) {
+                                    usedPairs.push_back({u, v});
+                                    w = GetRandomValue(1, 20);
+                                    mst.addEdge(u, v, w);
+                                    // Add the edge to the input lines
+                                    inputLines.push_back(std::to_string(u) + " " + std::to_string(v) + " " + std::to_string(w));
+                                }
+                            }
+                        } while (found || u == v);
+                    }
+                    
+                    // Add empty line at the end
+                    inputLines.push_back("");
+                    
+                    // Update current line, scroll position and max scroll
+                    maxScroll = std::max(0.0f, (inputLines.size() * 22) - inputContainer.height + 20);
+                    scrollY = maxScroll; // Scroll to bottom
+                }
+            }
+            firstRun = false;
+        }
+
+        // Update vertex positions with interactive physics
+        mst.updateVertexPositions();
+        
+        if (errorMsgTimer > 0) {
+            errorMsgTimer -= GetFrameTime();
+        }
+        
+        // Calculate scroll bar parameters
+        float containerHeight = inputContainer.height;
+        float contentHeight = inputLines.size() * 22;
+        scrollBarHeight = containerHeight * (containerHeight / contentHeight);
+        if (scrollBarHeight > containerHeight) scrollBarHeight = containerHeight;
+        scrollBarPos = (scrollY / maxScroll) * (containerHeight - scrollBarHeight);
+        if (maxScroll <= 0) scrollBarPos = 0;
+        
+        // Drawing code
+        BeginDrawing();
+            ClearBackground(RAYWHITE);
+            DrawBackButton(backBtn);
+
+            DrawHamburgerIconChPlay(hamburgerIcon);
+            // Draw MST visualization
+        
+                mst.drawDSU();
+                mst.drawEdgeList();
+            
+            mst.drawGraph();
+            const char* title = "Minimum Spanning Tree Visualization";
+            int titleWidth = MeasureText(title, 30);
+            DrawText(title, CENTER_X - titleWidth/2, TITLE_Y, 30, DARKGRAY);
+            if(isMenuOpen){
+                DrawSidebar(sidebar);
+                DrawHamburgerIconChPlay(hamburgerIcon);
+            }
+            if(isMenuOpen){
+                
+                // Draw vertex count input box with cursor
+                Color vertexBoxColor = isVertexInputTyping ? SKYBLUE : WHITE;
+                DrawRectangleRec(vertexInputBox, vertexBoxColor);
+                DrawRectangleRoundedLines(vertexInputBox, 0.1f, 0, ColorAlpha(DARKGRAY, 0.5f));
+                DrawText(vertexCountInput.c_str(), vertexInputBox.x + 10, vertexInputBox.y + 5, 20, BLACK);
+                // Draw cursor for vertex input box
+                if (isVertexInputTyping && ((int)(GetTime() * 2) % 2)) {
+                    std::string textBeforeCursor = vertexCountInput.substr(0, cursorPosition);
+                    int cursorX = vertexInputBox.x + 10 + MeasureText(textBeforeCursor.c_str(), 20);
+                    DrawRectangle(cursorX, vertexInputBox.y + 5, 2, 20, BLACK);
+                }
+                else{
+                    DrawText("Vertices:", vertexInputBox.x + 50, vertexInputBox.y + 5, 20, DARKGRAY);
+
+                }
+                
+                // Draw Run MST button
+                Color runMSTColor = CheckCollisionPointRec(mousePoint, runMSTButton) ? 
+                                (Color){41, 128, 185, 255} : (Color){52, 152, 219, 255};
+                DrawRectangleGradientH((int)runMSTButton.x, (int)runMSTButton.y, 
+                                    (int)runMSTButton.width, (int)runMSTButton.height,
+                                    runMSTColor, ColorBrightness(runMSTColor, 0.7f));
+                DrawRectangleRoundedLines(runMSTButton, 0.2f, 0, (Color){41, 128, 185, 255});
+                
+                const char* buttonText = "Run MST";
+                int btnTextWidth = MeasureText(buttonText, 20);
+                DrawText(buttonText, 
+                        (int)(runMSTButton.x + (runMSTButton.width - btnTextWidth)/2),
+                        (int)(runMSTButton.y + 10), 20, WHITE);
+                
+                // Draw scrollable input container
+                Color containerColor = isInputContainerActive ? ColorAlpha(SKYBLUE, 0.1f) : WHITE;
+                DrawRectangleRounded(inputContainer, 0.1f, 0, containerColor);
+                DrawRectangleRoundedLines(inputContainer, 0.1f, 0, ColorAlpha(DARKGRAY, 0.5f));
+                
+                // Scissor test to only draw text inside container
+                BeginScissorMode(inputContainer.x, inputContainer.y, inputContainer.width, inputContainer.height);
+                
+                // Draw each line of text with cursor
+                for (size_t i = 0; i < inputLines.size(); i++) {
+                    float yPos = inputContainer.y + 10 + (i * 22) - scrollY;
+                    
+                    // Only draw visible lines
+                    if (yPos >= inputContainer.y - 22 && yPos <= inputContainer.y + inputContainer.height) {
+                        // Highlight current line
+                        if (i == currentLine && isInputContainerActive) {
+                            DrawRectangle(inputContainer.x + 5, yPos - 2, inputContainer.width - 30, 22, ColorAlpha(SKYBLUE, 0.2f));
+                        }
+                        
+                        // Draw text with different colors based on prefix
+                        if (inputLines[i].empty()) {
+                            // Empty line
+                        } else if (inputLines[i][0] == '/') {
+                            // Comment line
+                            DrawText(inputLines[i].c_str(), inputContainer.x + 10, yPos, 20, DARKGRAY);
+                        } else {
+                            // Normal input line
+                            DrawText(inputLines[i].c_str(), inputContainer.x + 10, yPos, 20, BLACK);
+                        }
+                        
+                        // Draw cursor on current line
+                        if (i == currentLine && isInputContainerActive && ((int)(GetTime() * 2) % 2)) {
+                            // Measure text width up to cursor position for proper placement
+                            std::string textBeforeCursor = inputLines[i].substr(0, cursorPosition);
+                            int cursorX = inputContainer.x + 10 + MeasureText(textBeforeCursor.c_str(), 20);
+                            DrawRectangle(cursorX, yPos, 2, 20, BLACK);
+                        }
+                    }
+                }
+                
+                EndScissorMode();
+                
+                // Draw scroll bar if needed
+                if (contentHeight > containerHeight) {
+                    DrawRectangle(
+                        inputContainer.x + inputContainer.width - 20, 
+                        inputContainer.y, 
+                        20, 
+                        inputContainer.height, 
+                        ColorAlpha(LIGHTGRAY, 0.5f)
+                    );
+                    
+                    DrawRectangle(
+                        inputContainer.x + inputContainer.width - 18, 
+                        inputContainer.y + scrollBarPos, 
+                        16, 
+                        scrollBarHeight, 
+                        ColorAlpha(DARKGRAY, 0.5f)
+                    );
+                }
+                
+                // Draw random button and edge count input
+                Color randomColor = CheckCollisionPointRec(mousePoint, randomButton) ? 
+                                (Color){155, 89, 182, 255} : (Color){142, 68, 173, 255};
+                DrawRectangleGradientH(randomButton.x, randomButton.y, 
+                                    randomButton.width, randomButton.height,
+                                    randomColor, ColorBrightness(randomColor, 0.7f));
+                DrawRectangleRoundedLines(randomButton, 0.2f, 0, (Color){142, 68, 173, 255});
+                DrawText("Random", randomButton.x + 20, randomButton.y + 10, 20, WHITE);
+                
+                // Draw edge count input box with cursor
+                Color edgeBoxColor = isEdgeCountTyping ? SKYBLUE : WHITE;
+                DrawRectangleRec(edgeCountBox, edgeBoxColor);
+                DrawRectangleRoundedLines(edgeCountBox, 0.1f, 0, ColorAlpha(DARKGRAY, 0.5f));
+                if (edgeCountInput.empty() && !isEdgeCountTyping) {
+                    DrawText("# edges", edgeCountBox.x + 10, edgeCountBox.y + 10, 20, ColorAlpha(DARKGRAY, 0.5f));
+                } else {
+                    DrawText(edgeCountInput.c_str(), edgeCountBox.x + 10, edgeCountBox.y + 10, 20, BLACK);
+                    
+                    // Draw cursor for edge count input
+                    if (isEdgeCountTyping && ((int)(GetTime() * 2) % 2)) {
+                        std::string textBeforeCursor = edgeCountInput.substr(0, cursorPosition);
+                        int cursorX = edgeCountBox.x + 10 + MeasureText(textBeforeCursor.c_str(), 20);
+                        DrawRectangle(cursorX, edgeCountBox.y + 10, 2, 20, BLACK);
+                    }
+                }
+                
+                // Draw error message if any
+                if (errorMsgTimer > 0) {
+                    DrawText(errorMsg.c_str(), inputContainer.x, 
+                            inputContainer.y + inputContainer.height + 10, 20, 
+                            ColorAlpha(RED, errorMsgTimer/2.0f));
+                }
+                // DrawText("Load File", fileButton.x + 60, fileButton.y + 15, 20, WHITE);
+                // if (CheckCollisionPointRec(GetMousePosition(), fileButton)) {
+                //     DrawRectangleRounded(fileButton, 0.2f, 8, ColorBrightness(MD_PRIMARY, 0.2f));
+                // } else {
+                //     DrawRectangleRounded(fileButton, 0.2f, 8, MD_PRIMARY);
+                // }
+                // // Draw random button and edge count input
+                Color fileColor = CheckCollisionPointRec(mousePoint, fileButton) ? 
+                (Color){155, 89, 182, 255} : (Color){142, 68, 173, 255};
+                DrawRectangleGradientH(fileButton.x, fileButton.y, 
+                    fileButton.width, fileButton.height,
+                    fileColor, ColorBrightness(fileColor, 0.7f));
+                DrawRectangleRoundedLines(fileButton, 0.2f, 0, (Color){142, 68, 173, 255});
+                DrawText("Load File", fileButton.x + 20, fileButton.y + 10, 20, WHITE);
+            }
+            
+            
+            // Draw progress bar if animation frames are available
+            if (!mst.animationFrames.empty()) {
+                mst.drawProgressBar();
+            }
+ 
+            
+        EndDrawing();
+    }
+    
+    CloseWindow();
+}
+
+void RunAVLVisualization() {
+    Rectangle backBtn = CreateBackButton();
+    
+    AVL tree;
+    int screenWidth = 1920;
+    int screenHeight = 1080;
+    const float BUTTON_WIDTH = 80;
+    const float BUTTON_HEIGHT = 35;
+    const float BUTTON_SPACING = 10;
+    const float START_X = 800;
+    const float START_Y = 30;
+    // Existing buttons
+    // Hamburger icon: góc trái dưới (padding 10 pixel)
+    Rectangle hamburgerIcon = { 10, (float)screenHeight - 100, 40, 40 };
+    bool isMenuOpen = false;
+    float progressWidth = 500;
+    float progressHeight = 10;
+    float progressX = (screenWidth - progressWidth) / 2 - 100;
+    float progressY = screenHeight - 100;
+    
+    // Sidebar: toàn bộ chiều cao, chiều rộng 300 pixel (bên trái)
+    Rectangle sidebar = { 20 ,630, 290, (float)screenHeight };
+
+
+    Rectangle insertButton = { sidebar.x + 5, sidebar.y + 100, BUTTON_WIDTH, BUTTON_HEIGHT };
+    Rectangle deleteButton = { insertButton.x + BUTTON_WIDTH + BUTTON_SPACING, insertButton.y , BUTTON_WIDTH, BUTTON_HEIGHT };
+    Rectangle findButton = { deleteButton.x + BUTTON_WIDTH + BUTTON_SPACING, deleteButton.y, BUTTON_WIDTH, BUTTON_HEIGHT };
+
+    Rectangle insertBox = { insertButton.x, insertButton.y + BUTTON_HEIGHT + 5, BUTTON_WIDTH, BUTTON_HEIGHT };
+    Rectangle deleteBox = { deleteButton.x, deleteButton.y + BUTTON_HEIGHT + 5, BUTTON_WIDTH, BUTTON_HEIGHT };
+    Rectangle findBox = { findButton.x, findButton.y + BUTTON_HEIGHT + 5, BUTTON_WIDTH, BUTTON_HEIGHT };
+
+    // Add new UI elements for the new features
+    //Rectangle pauseResumeButton = { START_X + 4 * (BUTTON_WIDTH + BUTTON_SPACING), START_Y, BUTTON_WIDTH, BUTTON_HEIGHT };
+    Rectangle pauseResumeButton = {progressX - 70, progressY - 10, 50, 45};
+
+    // Add speed control buttons
+    Rectangle speedDecreaseButton =  {progressX + progressWidth + 20, progressY - 10, 45, 45}; // Larger
+    Rectangle speedIncreaseButton ={progressX + progressWidth + 70, progressY - 10, 45, 45}; // Larger
+    
+    // Add undo/redo buttons
+    Rectangle undoButton = {speedIncreaseButton.x + 45 + 10, speedIncreaseButton.y , 45, 45 };
+    Rectangle redoButton = {undoButton.x + 45 + 10, speedIncreaseButton.y, 45, 45 };
+
+
+    // Add traversal buttons
+    const float TRAVERSAL_START_X = 300; // Đặt ở bên trái màn hình
+    const float TRAVERSAL_Y = 100;
+    const float TRAVERSAL_BUTTON_WIDTH = 120;
+    const float TRAVERSAL_BUTTON_HEIGHT = 40;
+    const float TRAVERSAL_SPACING = 10;
+
+    Rectangle inorderButton = { insertBox.x, insertBox.y + insertBox.height + 15, BUTTON_WIDTH, BUTTON_HEIGHT };
+    Rectangle preorderButton = { deleteBox.x, deleteBox.y + deleteBox.height + 15, BUTTON_WIDTH, BUTTON_HEIGHT};
+    Rectangle postorderButton = { findBox.x, findBox.y + findBox.height + 15, BUTTON_WIDTH, BUTTON_HEIGHT};
+
+    // Add new buttons for backward/forward navigation
+    Rectangle forwardButton = {progressX - 130, progressY - 10, 55, 45}; // Much larger
+    Rectangle backwardButton = {progressX - 195, progressY - 10, 55, 45}; // Much larger
+    // Add initialization buttons near top of screen
+    Rectangle createEmptyBtn = { inorderButton.x, inorderButton.y + BUTTON_HEIGHT + BUTTON_SPACING, BUTTON_WIDTH, BUTTON_HEIGHT };
+    Rectangle createRandomBtn = { preorderButton.x  , preorderButton.y + BUTTON_HEIGHT + BUTTON_SPACING, BUTTON_WIDTH, BUTTON_HEIGHT };
+    Rectangle sizeInputBox = { createRandomBtn.x + createRandomBtn.width + BUTTON_SPACING, createRandomBtn.y, BUTTON_WIDTH, BUTTON_HEIGHT };
+    std::string sizeInput = "5";  // Default size
+    bool isSizeInputActive = false;
+
+    bool isTyping = false;
+    std::string inputText = "";
+    std::string operation = "";
+    Rectangle* activeTextBox = nullptr;
+    
+    // Variables for animation playback
+    int currentStep = 0;
+    std::vector<AVLTreeState> currentAnimation;
+    bool isPlayingAnimation = false;
+    int frameSkip = 1; // Animation speed control (higher means faster)
+    
+    // Variables for progress bar interaction
+    bool isDraggingProgressBar = false;
+    Rectangle progressBarRect = (Rectangle){progressX, progressY, progressWidth, progressHeight};
+
+    // Add file dialog state
+    GuiWindowFileDialogState fileDialogState = InitGuiWindowFileDialog(GetWorkingDirectory());
+    
+    // Add file load button next to search button
+    Rectangle fileButton = { createEmptyBtn.x, createEmptyBtn.y + createEmptyBtn.height + 15, (postorderButton.x + postorderButton.width - inorderButton.x), BUTTON_HEIGHT };
+    vector<int> file_data;
+    SetTargetFPS(120);
+    while (!WindowShouldClose()) {
+        Vector2 mousePoint = GetMousePosition();
+        
+        if (CheckCollisionPointRec(mousePoint, backBtn) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            return;
+        }
+        if(CheckCollisionPointRec(mousePoint, hamburgerIcon) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)){
+            isMenuOpen = !isMenuOpen;
+        }
+        // Handle playback speed controls
+        if (CheckCollisionPointRec(mousePoint, speedDecreaseButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            if (frameSkip > 1) frameSkip--;
+        }
+        
+        if (CheckCollisionPointRec(mousePoint, speedIncreaseButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            if (frameSkip < 10) frameSkip++;
+        }
+        
+        // Handle undo button
+        if (CheckCollisionPointRec(mousePoint, undoButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            if (tree.canUndo()) {
+                tree.undo();
+                isPlayingAnimation = false;
+                currentAnimation.clear();
+            }
+        }
+        
+        // Handle redo button
+        if (CheckCollisionPointRec(mousePoint, redoButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            if (tree.canRedo()) {
+                tree.redo();
+                isPlayingAnimation = false;
+                currentAnimation.clear();
+            }
+        }
+
+        // Handle animation playback
+        if (isPlayingAnimation && !isDraggingProgressBar) {
+            currentStep += frameSkip;
+            if (currentStep >= currentAnimation.size()) {
+                currentStep = currentAnimation.size() - 1;
+                isPlayingAnimation = false;
+            }
+        }
+
+        // Handle pause/resume button
+        if (CheckCollisionPointRec(mousePoint, pauseResumeButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            isPlayingAnimation = !isPlayingAnimation;
+        }
+
+        // Handle traversal buttons
+        if (CheckCollisionPointRec(mousePoint, inorderButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            tree.inorderTraversal();
+            currentAnimation = tree.animationStates;
+            currentStep = 0;
+            isPlayingAnimation = true;
+        }
+        
+        if (CheckCollisionPointRec(mousePoint, preorderButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            tree.preorderTraversal();
+            currentAnimation = tree.animationStates;
+            currentStep = 0;
+            isPlayingAnimation = true;
+        }
+        
+        if (CheckCollisionPointRec(mousePoint, postorderButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            tree.postorderTraversal();
+            currentAnimation = tree.animationStates;
+            currentStep = 0;
+            isPlayingAnimation = true;
+        }
+
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            if (CheckCollisionPointRec(mousePoint, insertButton)) {
+                isTyping = true;
+                operation = "insert";
+                activeTextBox = &insertBox;
+                inputText = "";
+                currentAnimation.clear();
+            }
+            else if (CheckCollisionPointRec(mousePoint, deleteButton)) {
+                isTyping = true;
+                operation = "delete";
+                activeTextBox = &deleteBox;
+                inputText = "";
+                currentAnimation.clear();
+            }
+            else if (CheckCollisionPointRec(mousePoint, findButton)) {
+                isTyping = true;
+                operation = "find";
+                activeTextBox = &findBox;
+                inputText = "";
+                currentAnimation.clear();
+            }
+            else if (CheckCollisionPointRec(mousePoint, createEmptyBtn) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                tree.createEmpty();
+                currentAnimation.clear();
+                currentStep = 0;
+            }
+
+            if (CheckCollisionPointRec(mousePoint, createRandomBtn) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                int size = std::stoi(sizeInput.empty() ? "5" : sizeInput);
+                if (size > 0) { // Limit size for performance
+                    cout << "sz =-------------------------------------- " << size << '\n';
+                    tree.createRandom(size);
+                    currentAnimation = tree.animationStates;
+                    currentStep = 0;
+                    isPlayingAnimation = true;
+                }
+            }
+
+            // Handle size input box
+            if (CheckCollisionPointRec(mousePoint, sizeInputBox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                isTyping = true;
+                operation = "size";
+                activeTextBox = &sizeInputBox;
+                inputText = sizeInput;
+            }
+        }
+
+        if (isTyping) {
+            if (operation == "size") {
+                int key = GetCharPressed();
+                while (key > 0) {
+                    if ((key >= '0' && key <= '9') && inputText.length() < 2) {
+                        inputText.push_back((char)key);
+                    }
+                    key = GetCharPressed();
+                }
+                
+                if (IsKeyPressed(KEY_BACKSPACE) && !inputText.empty()) {
+                    inputText.pop_back();
+                }
+                
+                if (IsKeyPressed(KEY_ENTER)) {
+                    sizeInput = inputText;
+                    isTyping = false;
+                    operation = "";
+                    activeTextBox = nullptr;
+                }
+            }
+            else {
+                int key = GetCharPressed();
+                while (key > 0) {
+                    if ((key >= '0' && key <= '9') && inputText.length() < 5)
+                        inputText.push_back((char)key);
+                    key = GetCharPressed();
+                }
+                if (IsKeyPressed(KEY_BACKSPACE) && !inputText.empty())
+                    inputText.pop_back();
+                if (IsKeyPressed(KEY_ENTER) && !inputText.empty()) {
+                    int value = atoi(inputText.c_str());
+                    
+                    // Clear previous animation
+                    tree.clearAnimationStates();
+                    currentStep = 0;
+                    
+                    if (operation == "insert") {
+                        tree.setPseudoCodeInsert(value);
+                        tree.insert(value);
+                        currentAnimation = tree.animationStates;
+                    }
+                    else if (operation == "delete") {
+                        tree.deleteKey(value);
+                        currentAnimation = tree.animationStates;
+                    }
+                    else if (operation == "find") {
+                        tree.find(value);
+                        currentAnimation = tree.animationStates;
+                    }
+                   
+                    
+                    // Start animation playback only if there are animation frames
+                    if (!currentAnimation.empty()) {
+                        isPlayingAnimation = true;
+                    } else {
+                        // If no animation frames were generated, just update the state
+                        tree.addStateToHistory();
+                    }
+                    
+                    isTyping = false;
+                    operation = "";
+                    activeTextBox = nullptr;
+                    inputText = "";
+                }
+            }
+        }
+
+        if((int)file_data.size() > 0){
+            // Clear previous animation
+            tree.clearAnimationStates();
+            currentStep = 0;
+            int value = file_data.back();
+            cout << value << '\n';
+            file_data.pop_back();
+            // tree.clearAnimationStates();
+
+            tree.setPseudoCodeInsert(value);
+            tree.insert(value);
+            currentAnimation = tree.animationStates;
+            currentStep = 0;
+            isPlayingAnimation = true;
+            //tree.historyStates.clear();
+            
+        }
+
+        // Only animate nodes if we're NOT playing an animation AND the current animation is empty
+        // This prevents node animation during playback which could cause double execution
+        if (!isPlayingAnimation && currentAnimation.empty()) {
+            //tree.animateNodes(tree.getRoot());
+        }
+        
+        // Handle progress bar interaction - only when we have animation frames
+        if (!currentAnimation.empty()) {
+            
+            // Handle mouse press on progress bar
+            if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && 
+                CheckCollisionPointRec(GetMousePosition(), progressBarRect)) {
+                isDraggingProgressBar = true;
+            }
+            
+            // Handle mouse drag on progress bar
+            if (isDraggingProgressBar) {
+                if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+                    // Calculate new position based on mouse position
+                    float mouseX = GetMousePosition().x;
+                    float progress = (mouseX - progressX) / progressWidth;
+                    
+                    // Clamp progress between 0 and 1
+                    progress = progress < 0 ? 0 : (progress > 1 ? 1 : progress);
+                    
+                    // Calculate new frame position
+                    currentStep = (int)(progress * (currentAnimation.size() - 1));
+                    
+                    // Ensure currentStep is within valid range
+                    currentStep = currentStep < 0 ? 0 : 
+                                 (currentStep >= currentAnimation.size() ? 
+                                  currentAnimation.size() - 1 : currentStep);
+                    
+                    // Pause animation while scrubbing
+                    isPlayingAnimation = false;
+                } else {
+                    // Release drag when mouse button is released
+                    isDraggingProgressBar = false;
+                }
+            }
+        }
+
+        // Handle backward button - jump to last frame of previous highlighted line
+        if (CheckCollisionPointRec(mousePoint, backwardButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            if (!currentAnimation.empty() && currentStep > 0) {
+                // Get current highlighted line
+                int currentHighlightedLine = currentAnimation[currentStep].highlightedLine;
+                
+                // First find the previous different highlighted line
+                int previousLine = -1;
+                int targetStep = currentStep;
+                
+                while (targetStep >= 0) {
+                    if (currentAnimation[targetStep].highlightedLine != currentHighlightedLine) {
+                        previousLine = currentAnimation[targetStep].highlightedLine;
+                        break;
+                    }
+                    targetStep--;
+                }   
+                // Jump to the last frame of the previous line
+                currentStep = max(0, targetStep);
+            } else {
+                // If no previous line, go to the first frame
+                currentStep = 0;
+            }
+            isPlayingAnimation = false; // Pause playback when stepping manually
+        }
+        
+        // Handle forward button - jump to LAST frame of next highlighted line
+        if (CheckCollisionPointRec(mousePoint, forwardButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            if (!currentAnimation.empty() && currentStep < currentAnimation.size() - 1) {
+                // Get current highlighted line
+                int currentHighlightedLine = currentAnimation[currentStep].highlightedLine;
+                
+                // First find the next different highlighted line
+                int nextLine = -1;
+                int firstFrameOfNextLine = -1;
+                int targetStep = currentStep;
+                
+                // Find the first occurrence of a different highlighted line
+                while (targetStep < currentAnimation.size()) {
+                    if (currentAnimation[targetStep].highlightedLine != currentHighlightedLine) {
+                        nextLine = currentAnimation[targetStep].highlightedLine;
+                        firstFrameOfNextLine = targetStep;
+                        break;
+                    }
+                    targetStep++;
+                }
+                
+                if (nextLine != -1) {
+                    // Now find the last frame with this new highlighted line
+                    int lastFrameOfNextLine = firstFrameOfNextLine;
+                    targetStep = firstFrameOfNextLine;
+                    
+                    while (targetStep < currentAnimation.size()) {
+                        if (currentAnimation[targetStep].highlightedLine == nextLine) {
+                            lastFrameOfNextLine = targetStep;
+                        } else {
+                            // Found a different highlight, stop here
+                            break;
+                        }
+                        targetStep++;
+                    }
+                    
+                    // Jump to the last frame of the next line
+                    currentStep = lastFrameOfNextLine;
+                } else {
+                    // If no next line, go to the last frame
+                    currentStep = currentAnimation.size() - 1;
+                }
+                
+                isPlayingAnimation = false; // Pause playback when stepping manually
+            }
+        }
+
+        
+        float buttonX = 1650;
+        float buttonY = 1000;
+        if(tree.showPseudoCode == true) buttonY = 500;
+        float buttonWidth = 220;
+        float buttonHeight = 40;
+        
+        // Check for collision with the pill-shaped button
+        bool collision = false;
+        float radius = buttonHeight / 2;
+        
+        // Check left circle
+        if (CheckCollisionPointCircle(mousePoint, (Vector2){buttonX + radius, buttonY + radius}, radius)) {
+            collision = true;
+        }
+        // Check right circle
+        else if (CheckCollisionPointCircle(mousePoint, (Vector2){buttonX + buttonWidth - radius, buttonY + radius}, radius)) {
+            collision = true;
+        }
+        // Check middle rectangle
+        else if (CheckCollisionPointRec(mousePoint, (Rectangle){buttonX + radius, buttonY, buttonWidth - buttonHeight, buttonHeight})) {
+            collision = true;
+        }
+        
+        if (collision && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            tree.showPseudoCode = !tree.showPseudoCode;
+        }
+    
+
+
+        BeginDrawing();
+            ClearBackground(RAYWHITE);
+            
+            // Visualization based on current state
+            if (!currentAnimation.empty() && currentStep < currentAnimation.size()) {
+                // If we have an animation in progress, show the current frame
+                tree.visualizeState(currentAnimation[currentStep]);
+            } else{
+                // Otherwise show the current state of the tree
+                tree.draw();
+                //tree.visualizeState(currentAnimation[currentAnimation.size() - 1]);
+            }
+            DrawHamburgerIconChPlay(hamburgerIcon);
+
+            if(isMenuOpen){
+                DrawSidebar(sidebar);
+                DrawHamburgerIconChPlay(hamburgerIcon);
+            
+                Color insertColor = CheckCollisionPointRec(mousePoint, insertButton) ? (Color){41, 128, 185, 255} : LIGHTGRAY;
+                Color deleteColor = CheckCollisionPointRec(mousePoint, deleteButton) ? (Color){231, 76, 60, 255} : LIGHTGRAY;
+                Color findColor = CheckCollisionPointRec(mousePoint, findButton) ? (Color){39, 174, 96, 255} : LIGHTGRAY;
+            
+                DrawRectangleRec(insertButton, insertColor);
+                DrawRectangleRec(deleteButton, deleteColor);
+                DrawRectangleRec(findButton, findColor);
+                
+                DrawText("Insert", (int)insertButton.x + 10, (int)insertButton.y + 8, 20, BLACK);
+                DrawText("Delete", (int)deleteButton.x + 10, (int)deleteButton.y + 8, 20, BLACK);
+                DrawText("Find", (int)findButton.x + 20, (int)findButton.y + 8, 20, BLACK);
+
+                // Draw traversal buttons
+                Color inorderColor = CheckCollisionPointRec(mousePoint, inorderButton) ? 
+                                (Color){125, 95, 235, 255} : (Color){125, 95, 255, 200};
+                Color preorderColor = CheckCollisionPointRec(mousePoint, preorderButton) ?
+                            (Color){125, 95, 235, 255} : (Color){125, 95, 255, 200};
+                Color postorderColor = CheckCollisionPointRec(mousePoint, postorderButton) ?
+                            (Color){125, 95, 235, 255} : (Color){125, 95, 255, 200};
+
+                DrawRectangleRounded(inorderButton, 0.2f, 8, inorderColor);
+                DrawRectangleRounded(preorderButton, 0.2f, 8, preorderColor);
+                DrawRectangleRounded(postorderButton, 0.2f, 8, postorderColor);
+
+                DrawText("In", inorderButton.x + 10, inorderButton.y + 10, 20, WHITE);
+                DrawText("Pre", preorderButton.x + 10, preorderButton.y + 10, 20, WHITE);
+                DrawText("Post", postorderButton.x + 10, postorderButton.y + 10, 20, WHITE);
+
+                // Draw traversal description
+                DrawText("Tree Traversals", TRAVERSAL_START_X, TRAVERSAL_Y - 30, 24, DARKGRAY);
+
+                // Draw initialization buttons
+                Color initBtnColor = LIGHTGRAY;
+                DrawRectangleRec(createEmptyBtn, CheckCollisionPointRec(mousePoint, createEmptyBtn) ? 
+                                (Color){41, 128, 185, 255} : initBtnColor);
+                DrawRectangleRec(createRandomBtn, CheckCollisionPointRec(mousePoint, createRandomBtn) ? 
+                                (Color){41, 128, 185, 255} : initBtnColor);
+                DrawText("Empty", createEmptyBtn.x + 15, createEmptyBtn.y + 8, 20, BLACK);
+                DrawText("Random", createRandomBtn.x + 10, createRandomBtn.y + 8, 20, BLACK);
+
+                // Draw size input box
+                DrawRectangleRec(sizeInputBox, WHITE);
+                DrawRectangleLines((int)sizeInputBox.x, (int)sizeInputBox.y, (int)sizeInputBox.width, (int)sizeInputBox.height, BLACK);
+                if (operation == "size") {
+                    DrawText(inputText.c_str(), (int)sizeInputBox.x + 5, (int)sizeInputBox.y + 8, 20, BLACK);
+                } else {
+                    DrawText(sizeInput.c_str(), (int)sizeInputBox.x + 5, (int)sizeInputBox.y + 8, 20, BLACK);
+                }
+                DrawText("Size:", sizeInputBox.x, sizeInputBox.y - 20, 16, DARKGRAY);
+    
+                if (operation == "insert") {
+                    DrawRectangleRec(insertBox, WHITE);
+                    DrawRectangleLines((int)insertBox.x, (int)insertBox.y, (int)insertBox.width, (int)insertBox.height, BLACK);
+                    DrawText(inputText.c_str(), (int)insertBox.x + 5, (int)insertBox.y + 8, 20, BLACK);
+                }
+                else if (operation == "delete") {
+                    DrawRectangleRec(deleteBox, WHITE);
+                    DrawRectangleLines((int)deleteBox.x, (int)deleteBox.y, (int)deleteBox.width, (int)deleteBox.height, BLACK);
+                    DrawText(inputText.c_str(), (int)deleteBox.x + 5, (int)deleteBox.y + 8, 20, BLACK);
+                }
+                else if (operation == "find") {
+                    DrawRectangleRec(findBox, WHITE);
+                    DrawRectangleLines((int)findBox.x, (int)findBox.y, (int)findBox.width, (int)findBox.height, BLACK);
+                    DrawText(inputText.c_str(), (int)findBox.x + 5, (int)findBox.y + 8, 20, BLACK);
+                }
+                
+                // Draw file button with matching style
+                Color fileColor = CheckCollisionPointRec(mousePoint, fileButton) ? 
+                                 (Color){41, 128, 185, 255} : LIGHTGRAY;
+                DrawRectangleRec(fileButton, fileColor);
+                DrawText("Load File", (int)fileButton.x + 20, (int)fileButton.y + 8, 20, BLACK);
+                
+
+            }    
+            Color speedDecColor = CheckCollisionPointRec(mousePoint, speedDecreaseButton) ? 
+                               (Color){41, 128, 185, 255} : LIGHTGRAY;
+            Color speedIncColor = CheckCollisionPointRec(mousePoint, speedIncreaseButton) ?
+                               (Color){41, 128, 185, 255} : LIGHTGRAY;
+                               
+            // DrawRectangleRec(speedDecreaseButton, speedDecColor);
+            // DrawRectangleRec(speedIncreaseButton, speedIncColor);
+            // DrawText("-", speedDecreaseButton.x + 20, speedDecreaseButton.y + 8, 20, BLACK);
+            // DrawText("+", speedIncreaseButton.x + 20, speedIncreaseButton.y + 8, 20, BLACK);
+            // DrawText(TextFormat("Speed: %d", frameSkip), 
+            //         speedDecreaseButton.x, 
+            //         speedDecreaseButton.y + BUTTON_HEIGHT + 5, 16, GRAY);
+
+            // // Vẽ nút Pause/Resume với màu và text phù hợp
+            // Color pauseResumeColor = CheckCollisionPointRec(mousePoint, pauseResumeButton) ? 
+            //                        (Color){41, 128, 185, 255} : LIGHTGRAY;
+            // DrawRectangleRec(pauseResumeButton, pauseResumeColor);
+            // const char* buttonText = isPlayingAnimation ? "Pause" : "Play";
+            // DrawText(buttonText, 
+            //         pauseResumeButton.x + (pauseResumeButton.width - MeasureText(buttonText, 20))/2, 
+            //         pauseResumeButton.y + 8, 20, BLACK);
+
+            // Draw undo/redo buttons
+            Color undoColor = tree.canUndo() ? 
+                            (CheckCollisionPointRec(mousePoint, undoButton) ? 
+                             (Color){41, 128, 185, 255} : GREEN) : 
+                            RED; // Disabled color
+                            
+            Color redoColor = tree.canRedo() ? 
+                            (CheckCollisionPointRec(mousePoint, redoButton) ? 
+                             (Color){41, 128, 185, 255} : GREEN) : 
+                            RED; // Disabled color
+            
+            // DrawRectangleRec(undoButton, undoColor);
+            // DrawRectangleRec(redoButton, redoColor);
+            
+            // DrawText("Undo", undoButton.x + 2, undoButton.y + 8, 20, BLACK);
+            // DrawText("Redo", redoButton.x + 2, redoButton.y + 8, 20, BLACK);
+            
+            DrawRectangleRounded(undoButton, 0.3, 6, undoColor);
+            DrawRectangleRoundedLines(undoButton, 0.3, 6, 
+                            BLACK);
+
+            DrawRectangleRounded(redoButton, 0.3, 6, redoColor);
+            DrawRectangleRoundedLines(redoButton, 0.3, 6, BLACK);
+
+            // Larger text on buttons
+            DrawText("Undo", undoButton.x + 2, undoButton.y + 12, 20, WHITE);
+            DrawText("Redo", redoButton.x + 2, redoButton.y + 12, 20, WHITE);
+
+            // Draw history position indicator
+            if (!tree.historyStates.empty()) {
+                DrawText(TextFormat("History: %d/%d", 
+                       tree.currentHistoryPosition + 1, 
+                       (int)tree.historyStates.size()),
+                       undoButton.x, undoButton.y + BUTTON_HEIGHT + 10, 16, DARKGRAY);
+            }
+
+            // Draw enhanced progress bar with scrubbing indicator
+            if (!currentAnimation.empty()) {
+  
+                
+                
+
+                // Draw scrubber track with better appearance - add shadows for depth
+                DrawRectangleRounded(
+                    (Rectangle){progressX - 3, progressY - 3, progressWidth + 6, progressHeight + 6}, 
+                    0.5, 8, (Color){40, 40, 40, 100} // Shadow
+                );
+
+                DrawRectangleGradientH(
+                    progressX, progressY, 
+                    progressWidth, progressHeight, 
+                    (Color){220, 220, 220, 255}, 
+                    (Color){180, 180, 180, 255}
+                );
+
+                // Draw track outline
+                DrawRectangleRoundedLines(
+                    (Rectangle){progressX, progressY, progressWidth, progressHeight}, 
+                    0.5, 8,  (Color){120, 120, 120, 200}
+                );
+
+                // Draw progress fill with gradient
+                float progress = (float)currentStep / (currentAnimation.size() - 1);
+                DrawRectangleGradientH(
+                    progressX, progressY, 
+                    progressWidth * progress, progressHeight,
+                    (Color){66, 134, 244, 255}, // Bright blue
+                    (Color){41, 128, 185, 255}  // Darker blue
+                );
+
+                // Draw scrubber handle with improved appearance
+                float handleX = progressX + progressWidth * progress;
+                float handleRadius = 15; // Increased from 12
+
+                // Handle shadow
+                DrawCircle(handleX + 2, progressY + progressHeight/2 + 2, handleRadius, (Color){40, 40, 40, 80});
+
+                // Handle body
+                DrawCircleGradient(
+                    handleX, progressY + progressHeight/2, 
+                    handleRadius,
+                    isDraggingProgressBar ? (Color){255, 100, 100, 255} : (Color){255, 255, 255, 255},
+                    isDraggingProgressBar ? (Color){200, 50, 50, 255} : (Color){220, 220, 220, 255}
+                );
+
+                // Handle outline
+                DrawCircleLines(handleX, progressY + progressHeight/2, handleRadius, (Color){100, 100, 100, 200});
+
+                // Draw frame counter with larger text
+                DrawText(
+                    TextFormat("Frame: %d / %d", currentStep, (int)currentAnimation.size()-1),
+                    progressX, progressY - 30, 22, (Color){50, 50, 50, 255}
+                );
+
+                // LARGER BUTTONS: Play/pause button
+                //Rectangle playPauseButton = {progressX - 70, progressY - 10, 50, 45}; // Much larger
+                DrawRectangleRounded(pauseResumeButton, 0.3, 6, 
+                    isPlayingAnimation ? (Color){52, 152, 219, 230} : (Color){46, 204, 113, 230});
+                DrawRectangleRoundedLines(pauseResumeButton, 0.3, 6, 
+                    isPlayingAnimation ? (Color){41, 128, 185, 255} : (Color){39, 174, 96, 255});
+
+                // Draw play/pause icon - larger
+                if (isPlayingAnimation) {
+                    DrawTriangle(
+                        (Vector2){pauseResumeButton.x + 13, pauseResumeButton.y + 8},
+                        (Vector2){pauseResumeButton.x + 13, pauseResumeButton.y + 37},
+                        (Vector2){pauseResumeButton.x + 40, pauseResumeButton.y + 22},
+                        WHITE
+                    );
+                } else {
+                    DrawRectangle(pauseResumeButton.x + 15, pauseResumeButton.y + 8, 8, 29, WHITE);
+                    DrawRectangle(pauseResumeButton.x + 28, pauseResumeButton.y + 8, 8, 29, WHITE);
+                }
+
+                
+                DrawRectangleRounded(speedDecreaseButton, 0.3, 6, (Color){192, 57, 43, 230});
+                DrawRectangleRoundedLines(speedDecreaseButton, 0.3, 6,  (Color){150, 40, 30, 255});
+
+                DrawRectangleRounded(speedIncreaseButton, 0.3, 6, (Color){39, 174, 96, 230});
+                DrawRectangleRoundedLines(speedIncreaseButton, 0.3, 6,  (Color){33, 148, 83, 255});
+
+                // Larger text on buttons
+                DrawText("-", speedDecreaseButton.x + 18, speedDecreaseButton.y + 10, 25, WHITE);
+                DrawText("+", speedIncreaseButton.x + 16, speedIncreaseButton.y + 10, 25, WHITE);
+
+                DrawText(TextFormat("Speed: %dx", frameSkip), 
+                speedDecreaseButton.x, speedDecreaseButton.y - 30, 20, DARKGRAY);
+
+                // LARGER BUTTONS: Step navigation buttons
+
+
+                Color backwardColor = (currentStep > 0) ? 
+                                (Color){41, currentStep, 185, 230} : (Color){150, 150, 150, 150};
+                Color forwardColor = (currentStep < currentAnimation.size() - 1) ? 
+                                (Color){41, 128, 185, 230} : (Color){150, 150, 150, 150};
+
+                DrawRectangleRounded(backwardButton, 0.3, 6, backwardColor);
+                DrawRectangleRoundedLines(backwardButton, 0.3, 6, 
+                                    (currentStep > 0) ? (Color){25, 80, 130, 255} : (Color){100, 100, 100, 150});
+
+                DrawRectangleRounded(forwardButton, 0.3, 6, forwardColor);
+                DrawRectangleRoundedLines(forwardButton, 0.3, 6, 
+                                    (currentStep < currentAnimation.size() - 1) ? (Color){25, 80, 130, 255} : (Color){100, 100, 100, 150});
+
+                // Larger text on buttons
+                DrawText("Prev", backwardButton.x + 10, backwardButton.y + 12, 20, WHITE);
+                DrawText("Next", forwardButton.x + 10, forwardButton.y + 12, 20, WHITE);
+
+                DrawText("Step By Code Line", backwardButton.x - 30, backwardButton.y - 30, 20, DARKGRAY);
+            }
+
+
+
+            // Handle file dialog
+            if (fileDialogState.windowActive) {
+                cout << "inside" << '\n';
+                GuiWindowFileDialog(&fileDialogState);
+                
+
+                if (fileDialogState.SelectFilePressed) {
+                    std::string selectedFilePath = std::string(fileDialogState.dirPathText) + "\\" + 
+                                                std::string(fileDialogState.fileNameText);
+                    
+                    std::ifstream inputFile(selectedFilePath);
+                    if (inputFile.is_open()) {
+                        // Clear existing list
+                        //list.clearLinkedList(); // Reset list
+                        //list.clearAnimationStates(); // Clear previous animation
+                        std::string line;
+                        while (std::getline(inputFile, line)) {
+                            try {
+                                // Skip empty lines and comments
+                                if (line.empty() || line[0] == '#' || line[0] == '/') 
+                                    continue;
+                                    
+                                int value = std::stoi(line);
+                                cout << value << '\n';
+                                file_data.push_back(value);
+                            } catch (const std::exception& e) {
+                                // Handle invalid input silently
+                                continue;
+                            }
+                        }
+                        inputFile.close();
+                    }
+                    fileDialogState.SelectFilePressed = false;
+                }
+            }
+            
+            DrawBackButton(backBtn);  // Make sure back button is drawn
+            EndDrawing();
+        //     // Add after other button click handlers:
+            if (CheckCollisionPointRec(mousePoint, fileButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                fileDialogState.windowActive = !fileDialogState.windowActive;
+                cout << "OK" << " " << fileDialogState.windowActive << '\n';
+            }
+        }
+        CloseWindow();
+    }
+    
 void RunLinkedListVisualization() {
     Rectangle backBtn = CreateBackButton();
     const int screenWidth = 1920;
