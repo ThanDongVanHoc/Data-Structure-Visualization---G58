@@ -579,6 +579,226 @@ void LinkedList::visualize() {
 }
 
 
+// Helper function to set pseudocode for addHead operation
+void LinkedList::setPseudoCodeAddHead(int value) {
+    currentOperation = "Add Head";
+    currentPseudoCode.clear();
+    
+    char valueLine[50];
+    sprintf(valueLine, "Node node = new Node(%d)", value);
+    
+    currentPseudoCode.push_back(valueLine);
+    currentPseudoCode.push_back("node.next = head");
+    currentPseudoCode.push_back("head = node");
+    
+    currentHighlightedLine = 0; // Start at first line
+}
+
+// Helper function to set pseudocode for addTail operation
+void LinkedList::setPseudoCodeAddTail(int value) {
+    currentOperation = "Add Tail";
+    currentPseudoCode.clear();
+    
+    char valueLine[50];
+    sprintf(valueLine, "Node node = new Node(%d)", value);
+    
+    currentPseudoCode.push_back(valueLine);
+    currentPseudoCode.push_back("tail.next = node");
+    currentPseudoCode.push_back("tail = node");
+    currentHighlightedLine = 0; // Start at first line
+}
+
+// Helper function to set pseudocode for insertAfter operation
+void LinkedList::setPseudoCodeInsertAfter(int index, int value) {
+    currentOperation = "Insert After";
+    currentPseudoCode.clear();
+    
+    char valueLine[50];
+    sprintf(valueLine, "Node newNode = new Node(%d)", value);
+    
+    currentPseudoCode.push_back("Node curr = head");
+    currentPseudoCode.push_back("for (int pos = 0; pos < index; pos++)");
+    currentPseudoCode.push_back("    curr = curr.next");
+    currentPseudoCode.push_back("// Found node at index");
+    currentPseudoCode.push_back(valueLine);
+    currentPseudoCode.push_back("newNode.next = curr.next, curr.next = newNode");
+
+    currentHighlightedLine = 0; // Start at first line
+}
+
+// Helper function to set pseudocode for insertAfter operation
+void LinkedList::setPseudoCodeRemoveAtIdx() {
+    currentOperation = "Remove At Index";
+    currentPseudoCode.clear();
+    currentPseudoCode.push_back("// Check if list is empty");
+    currentPseudoCode.push_back("Node* curr = head");
+    currentPseudoCode.push_back("for (int pos = 0; pos < index-1; pos++)");
+    currentPseudoCode.push_back("    curr = curr.next");
+    currentPseudoCode.push_back("Node* temp = curr.next, curr.next = temp.next // Node to delete & bypass it");
+    currentPseudoCode.push_back("delete temp // Free memory");
+    
+    currentHighlightedLine = 0; // Start at first line
+}
+
+
+void LinkedList::setPseudoCodeSearch() {
+    currentOperation = "Search Value";
+    currentPseudoCode.clear();
+    currentPseudoCode.push_back("if empty, return NOT_FOUND");
+    currentPseudoCode.push_back("index = 0, tmp = head");
+    currentPseudoCode.push_back("while (tmp.item != v && index < list.size())");
+    currentPseudoCode.push_back("  index++, tmp = tmp.next");
+    currentPseudoCode.push_back("return index < list.size()");
+    
+    currentHighlightedLine = 0; // Start at first line
+}
+
+// Helper function to set pseudocode for delete operation
+void LinkedList::setPseudoCodeDelete(int value) {
+    currentOperation = "Delete Node";
+    currentPseudoCode.clear();
+    
+    char valueLine[50];
+    sprintf(valueLine, "// Delete node with value %d", value);
+    
+    currentPseudoCode.push_back(valueLine);
+    currentPseudoCode.push_back("if (head == NULL) return");
+    currentPseudoCode.push_back("Node* curr = head");
+    currentPseudoCode.push_back("while (curr->next && curr->next->value != value)");
+    currentPseudoCode.push_back("   curr = curr->next");
+    currentPseudoCode.push_back("curr->next = curr->next->next // Bypass the node to delete");
+    currentPseudoCode.push_back("delete curr->next // Free memory");
+    
+    currentHighlightedLine = 0; // Start at first line
+}
+
+// Update the highlighted pseudocode line based on animation state
+void LinkedList::updatePseudoCodeHighlight() {
+    if (currentPseudoCode.empty()) return;
+    
+    // Check if we're adding a new head
+    if (currentOperation == "Add Head" && lastInsertedNode && lastInsertedNode == head) {
+        // If node is moving to target - highlight line 1
+        float dx = lastInsertedNode->targetX - lastInsertedNode->x;
+        float dy = lastInsertedNode->targetY - lastInsertedNode->y;
+        
+        if (fabs(dx) > SETTLE_DISTANCE || fabs(dy) > SETTLE_DISTANCE) {
+            currentHighlightedLine = 0; // "Node node = new Node(value)"
+        }
+        // If node is close to target but edge is animating - highlight line 2
+        else if (areNodesSettled()) {
+            // Check if the edge from head is still animating
+            for (auto& edge : edges) {
+                if (edge.startNode == head && edge.isAnimating) {
+                    currentHighlightedLine = 1; // "node.next = head"
+                    std::cout << "Edge animating from head" << '\n';
+                    return;
+                }
+            }
+            // If no edge is animating, highlight the last line
+            currentHighlightedLine = 2; // "head = node"
+        }
+    }
+    // Check if we're adding a tail
+    else if (currentOperation == "Add Tail" && TailNode) {
+        // If node is moving to target - highlight line 1
+        float dx = TailNode->targetX - TailNode->x;
+        float dy = TailNode->targetY - TailNode->y;
+        
+        if (fabs(dx) > SETTLE_DISTANCE || fabs(dy) > SETTLE_DISTANCE) {
+            currentHighlightedLine = 0; // "Node node = new Node(value)"
+        }
+        // If node is close to target but edge is animating - highlight line 2
+        else if (areNodesSettled()) {
+            // Check if the edge to TailNode is still animating
+            bool foundAnimatingEdge = false;
+            for (auto& edge : edges) {
+                if(edge.endNode == TailNode){
+                    std::cout << "corresponding edge found: " << edge.endNode->value << " - " << TailNode->value << '\n';
+                    std::cout << "Animation progress: " << edge.animationProgress << '\n';
+                    
+                    // Check animation progress instead of just isAnimating flag
+                    if (edge.animationProgress < 1.0f) {
+                        currentHighlightedLine = 1; // "tail.next = node"
+                        std::cout << "Edge animating to tail" << '\n';
+                        foundAnimatingEdge = true;
+                        break;
+                    }
+                }
+            }
+            
+            // If no edge is animating, highlight the last line
+            if (!foundAnimatingEdge) {
+                currentHighlightedLine = 2; // "tail = node"
+            }
+        }
+    }
+    // Check if we're inserting after a specific index
+    else if (currentOperation == "Insert After") {
+        // Logic for insertAfter operation
+        // Determine if we're in traversal phase, node creation, or linking phase
+        if (lastInsertedNode) {
+            Node* curr = head;
+            int index = 0;
+            while (curr && curr->next != lastInsertedNode) {
+                curr = curr->next;
+                index++;
+            }
+            
+            if (curr && curr->next == lastInsertedNode) {
+                // Check if node is moving to position or edge is being created
+                float dx = lastInsertedNode->targetX - lastInsertedNode->x;
+                float dy = lastInsertedNode->targetY - lastInsertedNode->y;
+                
+                if (fabs(dx) > SETTLE_DISTANCE || fabs(dy) > SETTLE_DISTANCE) {
+                    currentHighlightedLine = 5; // "Node node = new Node(value)"
+                } else {
+                    for (auto& edge : edges) {
+                        if ((edge.startNode == curr && edge.endNode == lastInsertedNode) || 
+                            (edge.startNode == lastInsertedNode)) {
+                            
+                            if (edge.isAnimating && edge.startNode == lastInsertedNode) {
+                                currentHighlightedLine = 6; // "node.next = current.next"
+                                return;
+                            } else if (edge.isAnimating && edge.endNode == lastInsertedNode) {
+                                currentHighlightedLine = 7; // "current.next = node"
+                                return;
+                            }
+                        }
+                    }
+                    currentHighlightedLine = 7; // Final step
+                }
+            } else {
+                // Still in traversal
+                currentHighlightedLine = 2; // "while position < index:"
+            }
+        } else {
+            // Initial traversal state
+            currentHighlightedLine = 0; // "Node current = head"
+        }
+    }
+    // Check if we're in delete operation
+    else if (currentOperation == "Delete Node") {
+        if (isDeleting) {
+            if (currentDeleteNode) {
+                if (currentDeleteNode == head) {
+                    currentHighlightedLine = 1; // "if head.value == targetValue:"
+                } else {
+                    currentHighlightedLine = 7; // "while current.next && current.next.value != targetValue:"
+                }
+            } else if (deleteFound) {
+                if (head && head->value == deleteTargetValue) {
+                    currentHighlightedLine = 3; // "head = head.next"
+                } else {
+                    currentHighlightedLine = 11; // "current.next = temp.next"
+                }
+            }
+        } else {
+            // Deletion completed
+            currentHighlightedLine = 12; // Last step
+        }
+    }
+}
 
 // Hàm addHead(): tạo node mới với giá trị cho trước và update layout
 void LinkedList::addHead(int value) {
