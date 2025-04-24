@@ -1406,6 +1406,71 @@ void RunLinkedListVisualization() {
     CloseWindow();
 }
 
+void RunShortestPath(){
+    const int ScreenWidth = 1920;
+    const int ScreenHeight = 1080;
+
+    Rectangle backBtn = CreateBackButton();
+    LoadFonts();
+
+    while (!WindowShouldClose())
+    {
+        Vector2 mousePoint = GetMousePosition();
+        
+        if (CheckCollisionPointRec(mousePoint, backBtn) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            return;
+        }
+        rendershortestpath(ScreenWidth, ScreenHeight);
+        DrawBackButton(backBtn);  // Make sure back button is drawn
+    }
+    UnloadFont(GetFont());
+    return;
+}
+
+void RunTrie(){
+    Rectangle backBtn = CreateBackButton();
+    const int ScreenWidth = 1920;
+    const int ScreenHeight = 1080;
+    LoadFonts();
+    while (!WindowShouldClose())
+    {
+        Vector2 mousePoint = GetMousePosition();
+        
+        if (CheckCollisionPointRec(mousePoint, backBtn) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            return;
+        }
+
+        BeginDrawing();
+        ClearBackground(RAYWHITE);
+        DrawBackButton(backBtn);  // Make sure back button is drawn
+        RenderTrie();
+        EndDrawing();
+    }
+    UnloadFont(GetFont());
+    CloseWindow();
+}
+
+void RunHashTable(){
+    Rectangle backBtn = CreateBackButton();
+    const int ScreenWidth = 1920;
+    const int ScreenHeight = 1080;
+    LoadFonts();
+    while (!WindowShouldClose())
+    {
+        Vector2 mousePoint = GetMousePosition();
+        
+        if (CheckCollisionPointRec(mousePoint, backBtn) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            return;
+        }
+
+        BeginDrawing();
+        ClearBackground(RAYWHITE);
+        DrawBackButton(backBtn);
+        RenderHashTable();
+        EndDrawing();
+    }
+    UnloadFonts();
+}
 
 int main() {
     ShowMenu();
