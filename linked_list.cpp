@@ -655,6 +655,134 @@ void LinkedList::insertAfter(int index, int value) {
 }
 
 
+// Hàm animateDeleteTraversal(): duyệt danh sách highlight dần các node từ đầu cho đến node có giá trị cần xóa
+void LinkedList::animateDeleteTraversal(int value) {
+    Node* curr = head;    
+    // Clear any previous animation states
+    animationStates.clear();
+    
+    // First capture the initial state before any highlighting
+    animationStates.push_back(captureCurrentState());
+    currentHighlightedLine = 0;
+    for(int i = 0; i < 60; i++)
+        animationStates.push_back(captureCurrentState());
+    currentHighlightedLine = 1;
+        for(int i = 0; i < 60; i++)
+            animationStates.push_back(captureCurrentState());
+    currentHighlightedLine = 2;
+        for(int i = 0; i < 60; i++)
+            animationStates.push_back(captureCurrentState());
+        
+    while (curr) {
+        // Save original color
+        Color original = curr->color;
+        
+        // Highlight current node
+        curr->color = HIGHLIGHT_COLOR;
+        currentHighlightedLine = 3;
+        // Capture the state with this node highlighted
+        animationStates.push_back(captureCurrentState());
+        
+        // Add multiple frames to create a pause effect
+        for (int i = 0; i < 60; i++) {
+            animationStates.push_back(captureCurrentState());
+        }
+        
+        // Check if this is the node to be deleted
+        if (curr->value == value) {
+            // Extra highlight for target node with more visible color
+            curr->color = DELETE_HIGHLIGHT_COLOR;
+            currentHighlightedLine = 5;
+            animationStates.push_back(captureCurrentState());
+            // Add more frames for emphasis on the target node
+            for (int i = 0; i < 120; i++) {
+                animationStates.push_back(captureCurrentState());
+            }
+            
+            // Don't reset the color - leave it highlighted in red
+            break;
+        }
+        currentHighlightedLine = 4;
+        for(int i = 0; i < 60; i++)
+            animationStates.push_back(captureCurrentState());
+        // Reset to original color before moving to next node
+        curr->color = original;
+        animationStates.push_back(captureCurrentState());
+        
+        curr = curr->next;
+    }
+    
+    currentHighlightedLine = 6;
+    // Add a few final frames showing the end state
+    for (int i = 0; i < 60; i++) {
+        animationStates.push_back(captureCurrentState());
+    }
+
+}
+
+// Hàm animateInsertAfterTraversal(): duyệt danh sách highlight dần các node từ đầu cho đến node có chỉ số index
+void LinkedList::animateInsertAfterTraversal(int index) {
+    Node* curr = head;
+    int pos = 0;
+    
+    // Clear any previous animation states
+    animationStates.clear();
+    
+    // First capture the initial state before any highlighting
+    currentHighlightedLine = 0;
+    for(int i = 0; i < 60; i++)
+        animationStates.push_back(captureCurrentState());
+
+    
+    while (curr) {
+        // Save original color
+        Color original = curr->color;
+        
+        // Highlight current node
+        curr->color = HIGHLIGHT_COLOR;
+        
+        // Capture the state with this node highlighted
+    
+        // Add multiple frames to create a pause effect
+        currentHighlightedLine = 1;
+        for (int i = 0; i < 60; i++) {
+            animationStates.push_back(captureCurrentState());
+        }
+        
+        
+        if (pos == index) {
+            // Extra highlight for target node with more visible color
+            curr->color = RED;
+            currentHighlightedLine = 3;
+            animationStates.push_back(captureCurrentState());
+            
+            // Add more frames for emphasis on the target node
+            for (int i = 0; i < 120; i++) { // Increase to 120 frames for longer emphasis
+                animationStates.push_back(captureCurrentState());
+            }
+            
+            // Reset color back to original
+            curr->color = original;
+            //animationStates.push_back(captureCurrentState());
+            break;
+        }
+        currentHighlightedLine = 2;
+        for(int i = 0; i < 60; i++)
+            animationStates.push_back(captureCurrentState());
+        
+        // Reset to original color before moving to next node
+        curr->color = original;
+        animationStates.push_back(captureCurrentState());
+        
+        pos++;
+        curr = curr->next;
+    }
+    
+    // // Add a few final frames showing the end state
+    // for (int i = 0; i < 60; i++) {
+    //     animationStates.push_back(captureCurrentState());
+    // }
+}
 
 // Hàm deleteValue(): trước khi xóa, thực hiện highlight traversal để tìm node cần xóa
 void LinkedList::deleteValue(int value) {
