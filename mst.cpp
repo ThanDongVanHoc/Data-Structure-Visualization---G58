@@ -142,6 +142,192 @@ void MST::animateEdgeColor(Edge &e, Color start, Color end, int durationMs) {
     }
 }
 
+
+// ADDED: Set pseudocode for Kruskal's algorithm
+void MST::setPseudoCodeKruskal() {
+    currentOperation = "Kruskal's MST Algorithm";
+    currentPseudoCode.clear();
+    
+    // Use the actual pseudocode with empty lines in between for clearer display
+    currentPseudoCode.push_back("Sort E edges by increasing weight");
+    currentPseudoCode.push_back("T = {}");
+    currentPseudoCode.push_back("for (i = 0; i < edgeList.length; i++)");
+    currentPseudoCode.push_back("  if adding e = edgelist[i] does not form a cycle");
+    currentPseudoCode.push_back("    add e to T");
+    currentPseudoCode.push_back("  else ignore e");
+    currentPseudoCode.push_back("MST = T");
+    
+    currentHighlightedLine = 0;
+}
+
+// ADDED: Update highlighted line
+void MST::updatePseudoCodeHighlight(int line) {
+    currentHighlightedLine = line;
+    // Add current highlighted line to the frame recording
+    pseudoCodeHighlightFrames.push_back(line);
+}
+
+// ADDED: Update the drawPseudoCode method with a unique, elegant button design
+void MST::drawPseudoCode() {
+    // Create a stylish pill-shaped button with gradient and shadow
+    float buttonX = 1650;
+    float buttonY = 1000;
+    if(showPseudoCode == true) buttonY = 700;
+    float buttonWidth = 220;
+    float buttonHeight = 40;
+    
+    // Draw shadow for floating effect
+    DrawRectangleRounded(
+        (Rectangle){buttonX + 3, buttonY + 3, buttonWidth, buttonHeight},
+        0.5, 8, (Color){20, 20, 20, 50}
+    );
+    
+    // Draw main button background - gradient
+    Color startColor = showPseudoCode ? (Color){142, 68, 173, 240} : (Color){52, 152, 219, 240};
+    Color endColor = showPseudoCode ? (Color){155, 89, 182, 240} : (Color){41, 128, 185, 240};
+    
+    // Create a pill shape with two half-circles and a rectangle
+    float radius = buttonHeight / 2;
+    
+    // Left half-circle
+    DrawCircleGradient(
+        buttonX + radius, buttonY + radius,
+        radius,
+        startColor, endColor
+    );
+    
+    // Right half-circle
+    DrawCircleGradient(
+        buttonX + buttonWidth - radius, buttonY + radius,
+        radius,
+        endColor, startColor
+    );
+    
+    // Center rectangle with gradient
+    DrawRectangleGradientH(
+        buttonX + radius, buttonY,
+        buttonWidth - buttonHeight, buttonHeight,
+        startColor, endColor
+    );
+    
+    // Draw outline
+    DrawRing(
+        (Vector2){buttonX + radius, buttonY + radius}, 
+        radius - 1, radius, 0, 180, 36, 
+        showPseudoCode ? (Color){142, 68, 173, 255} : (Color){41, 128, 185, 255}
+    );
+    DrawRing(
+        (Vector2){buttonX + buttonWidth - radius, buttonY + radius}, 
+        radius - 1, radius, 180, 360, 36, 
+        showPseudoCode ? (Color){142, 68, 173, 255} : (Color){41, 128, 185, 255}
+    );
+    DrawRectangle(
+        buttonX + radius, buttonY - 1,
+        buttonWidth - buttonHeight, 2,
+        showPseudoCode ? (Color){142, 68, 173, 255} : (Color){41, 128, 185, 255}
+    );
+    DrawRectangle(
+        buttonX + radius, buttonY + buttonHeight - 1,
+        buttonWidth - buttonHeight, 2,
+        showPseudoCode ? (Color){142, 68, 173, 255} : (Color){41, 128, 185, 255}
+    );
+    
+    // Draw icon instead of text
+    if (showPseudoCode) {
+        // Eye icon with slash (hide)
+        DrawCircleLines(buttonX + 50, buttonY + radius, 10, WHITE);
+        DrawLine(buttonX + 38, buttonY + radius - 12, buttonX + 62, buttonY + radius + 12, WHITE);
+    } else {
+        // Eye icon (show)
+        DrawCircleLines(buttonX + 50, buttonY + radius, 10, WHITE);
+        DrawCircle(buttonX + 50, buttonY + radius, 4, WHITE);
+    }
+    
+    // Draw text with shadow effect for depth
+    const char* buttonText = showPseudoCode ? "Hide Algorithm" : "Show Algorithm";
+    DrawText(buttonText, buttonX + 80 + 1, buttonY + 13 + 1, 18, (Color){0, 0, 0, 120});
+    DrawText(buttonText, buttonX + 80, buttonY + 13, 18, WHITE);
+    
+    // Only draw pseudocode if toggle is on
+    if (showPseudoCode && !currentPseudoCode.empty()) {
+        int startX = 1400;
+        int startY = 800;
+        int lineHeight = 30;
+        int paddingX = 20;
+        int paddingY = 15;
+        
+        // Calculate box dimensions based on content
+        int boxWidth = 0;
+        for (const auto& line : currentPseudoCode) {
+            int width = MeasureText(line.c_str(), 20) + 2 * paddingX;
+            boxWidth = std::max(boxWidth, width);
+        }
+        
+        // Make sure the box is wide enough for the title too
+        int titleWidth = MeasureText(currentOperation.c_str(), 24) + 2 * paddingX;
+        boxWidth = std::max(boxWidth, titleWidth);
+        
+        int boxHeight = currentPseudoCode.size() * lineHeight + 2 * paddingY + lineHeight; // Extra line for title
+        
+        // Draw background box with drop shadow
+        DrawRectangle(startX - paddingX + 5, startY - lineHeight - paddingY + 5, 
+                     boxWidth, boxHeight, (Color){40, 40, 40, 100}); // Shadow
+        
+        DrawRectangleRounded(
+            (Rectangle){startX - paddingX, startY - lineHeight - paddingY, boxWidth, boxHeight}, 
+            0.1, 8, (Color){240, 240, 240, 240}
+        );
+        
+        DrawRectangleRoundedLines(
+            (Rectangle){startX - paddingX, startY - lineHeight - paddingY, boxWidth, boxHeight}, 
+            0.1, 8, (Color){100, 100, 100, 200}
+        );
+        
+        // Draw operation name (title)
+        DrawTextEx(customFont, currentOperation.c_str(), (Vector2){startX, startY - lineHeight}, 24, 1, BLACK);
+        
+        // Draw each line of pseudocode
+        for (size_t i = 0; i < currentPseudoCode.size(); i++) {
+            Color textColor = (i == currentHighlightedLine) ? RED : BLACK;
+            DrawTextEx(customFont, currentPseudoCode[i].c_str(), (Vector2){startX, startY + i * lineHeight}, 20, 1, textColor);
+        }
+    }
+}
+
+// NEW: Add handler for pseudocode toggle button
+void MST::handlePseudoCodeToggle() {
+    Vector2 mousePos = GetMousePosition();
+    
+    float buttonX = 1650;
+    float buttonY = 1000;
+    if(showPseudoCode == true) buttonY = 700;
+    float buttonWidth = 220;
+    float buttonHeight = 40;
+    
+    // Check for collision with the pill-shaped button
+    bool collision = false;
+    float radius = buttonHeight / 2;
+    
+    // Check left circle
+    if (CheckCollisionPointCircle(mousePos, (Vector2){buttonX + radius, buttonY + radius}, radius)) {
+        collision = true;
+    }
+    // Check right circle
+    else if (CheckCollisionPointCircle(mousePos, (Vector2){buttonX + buttonWidth - radius, buttonY + radius}, radius)) {
+        collision = true;
+    }
+    // Check middle rectangle
+    else if (CheckCollisionPointRec(mousePos, (Rectangle){buttonX + radius, buttonY, buttonWidth - buttonHeight, buttonHeight})) {
+        collision = true;
+    }
+    
+    if (collision && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        showPseudoCode = !showPseudoCode;
+    }
+}
+
+
+
 void MST::runKruskal() {
     // Initialize pseudocode
     
