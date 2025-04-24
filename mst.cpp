@@ -323,3 +323,151 @@ void MST::runKruskal() {
 }
 
 ////////////////////
+///////////////////////////////////////////////////////////
+// Visualization methods
+
+// Sửa lại hàm vẽ DSU theo cột dọc
+void MST::drawDSU() {
+    // Vẽ tiêu đề cho DSU
+    DrawText("Disjoint Set Union", DSU_START_X, DSU_START_Y, 25, DARKGRAY);
+    
+    // Vẽ bảng DSU
+    for (int i = 1; i <= n; i++) {
+        int y = DSU_START_Y + 40 + (i-1) * DSU_CELL_HEIGHT;
+        Color colText = (i == highlightVertex1 || i == highlightVertex2) ? ORANGE : BLACK;
+        std::string s = "pa[" + std::to_string(i) + "] = " + std::to_string(parent[i]);
+        DrawText(s.c_str(), DSU_START_X, y, 20, colText);
+    }
+}
+
+// Vẽ danh sách cạnh (Edge List) dựa trên currentPos.
+void MST::drawEdgeList() {
+    // Calculate title position based on DSU size
+    float edgeListStartY = DSU_START_Y + (n + 3) * DSU_CELL_HEIGHT + 50;
+    
+    // Vẽ tiêu đề Edge List 
+    DrawText("Edge List (sorted by weight)", DSU_START_X, edgeListStartY, 25, DARKGRAY);
+    
+    // Draw each edge (they're now positioned in rows)
+    for (int i = 0; i < edges.size(); i++) {
+        if (edges[i].color.a == 0) continue;
+        
+        // Sử dụng currentPos cho animation
+        Vector2 lineStart = edges[i].currentPos;
+        Vector2 lineEnd = { lineStart.x + FIXED_EDGE_LIST_LENGTH, lineStart.y };
+        
+        float thickness = (edges[i].color.r == ORANGE.r || edges[i].color.r == GREEN.r) ? 
+                         EDGE_THICKNESS : EDGE_NORMAL_THICKNESS;
+        DrawLineEx(lineStart, lineEnd, thickness, edges[i].color);
+        std::string s = std::to_string(edges[i].u) + "-" + std::to_string(edges[i].v) +
+                        " (" + std::to_string(edges[i].w) + ")";
+        DrawText(s.c_str(), lineEnd.x + 10, lineStart.y - 5, 20, edges[i].color);
+    }
+}
+
+// Vẽ đồ thị: các đỉnh trên vòng tròn và các cạnh được vẽ không nối từ tâm đến tâm mà từ viền đỉnh.
+void MST::drawGraph() {
+    // Draw mode toggle button first
+    drawModeToggle();
+    
+    // Draw pseudocode
+    drawPseudoCode();
+    
+    // First draw edges to ensure they appear behind vertices
+    for (auto &e : edges) {
+        if (e.color.a == 0) continue;
+        
+        // Calculate direction vector from posU to posV
+        Vector2 dir = { e.posV.x - e.posU.x, e.posV.y - e.posU.y };
+        float len = sqrt(dir.x * dir.x + dir.y * dir.y);
+        if (len == 0) continue;
+        
+        // Normalize direction vector
+        dir.x /= len; dir.y /= len;
+        
+        // Calculate start and end points, leaving space for vertex
+        Vector2 start = { e.posU.x + dir.x * VERTEX_RADIUS, e.posU.y + dir.y * VERTEX_RADIUS };
+        Vector2 end = { e.posV.x - dir.x * VERTEX_RADIUS, e.posV.y - dir.y * VERTEX_RADIUS };
+        
+        // Use enhanced thickness based on edge state
+        float thickness = (e.color.r == ORANGE.r || e.color.r == GREEN.r) ? 
+                         EDGE_GRAPH_HIGHLIGHT_THICKNESS : EDGE_GRAPH_THICKNESS;
+        
+        // Draw edge with slight transparency for better look
+        Color edgeColor = e.color;
+        if (edgeColor.r == DARKGRAY.r && edgeColor.g == DARKGRAY.g && edgeColor.b == DARKGRAY.b) {
+            edgeColor = EDGE_DEFAULT_COLOR; // Use custom gray for better visibility
+        }
+        
+        // Draw edge with transparency gradient for depth effect
+        Color startColor = edgeColor;
+        Color endColor = edgeColor;
+        startColor.a = 220;
+        endColor.a = 220;
+        
+        DrawLineEx(start, end, thickness, edgeColor);
+        
+        // Calculate midpoint for weight label
+        Vector2 mid = { (start.x + end.x) / 2, (start.y + end.y) / 2 };
+        
+        // Calculate perpendicular direction for weight offset
+        Vector2 perp = { -dir.y, dir.x };
+        Vector2 weightPos = { mid.x + perp.x * WEIGHT_OFFSET, mid.y + perp.y * WEIGHT_OFFSET };
+        
+        // Prepare weight text with better visibility
+        std::string weightStr = std::to_string(e.w);
+        int textWidth = MeasureText(weightStr.c_str(), 20);
+        int textHeight = 20;
+        
+        // Draw background bubble for weight text
+        DrawRectangleRounded(
+            (Rectangle){
+                weightPos.x - textWidth/2 - WEIGHT_BUBBLE_PADDING/2,
+                weightPos.y - textHeight/2 - WEIGHT_BUBBLE_PADDING/2,
+                textWidth + WEIGHT_BUBBLE_PADDING,
+                textHeight + WEIGHT_BUBBLE_PADDING
+            },
+            0.5f, 8, WEIGHT_BG_COLOR
+        );
+        
+        // Draw weight text with slight shadow for better visibility
+        DrawText(weightStr.c_str(), weightPos.x - textWidth/2 + 1, weightPos.y - textHeight/2 + 1, 20, (Color){100, 100, 100, 128});
+        DrawText(weightStr.c_str(), weightPos.x - textWidth/2, weightPos.y - textHeight/2, 20, edgeColor);
+    }
+    
+    // Draw vertices with enhanced styling
+    for (int i = 1; i <= n; i++) {
+        Vector2 pos = vertexPositions[i];
+        
+        // Determine vertex color based on highlight state
+        Color vertexColor = VERTEX_FILL_COLOR;
+        Color textColor = VERTEX_TEXT_COLOR;
+        
+        if (i == highlightVertex1 || i == highlightVertex2) {
+            vertexColor = VERTEX_HIGHLIGHT_COLOR;
+        }
+        
+        // Draw shadow for 3D effect
+        DrawCircle(pos.x + VERTEX_SHADOW_OFFSET, pos.y + VERTEX_SHADOW_OFFSET, 
+                   VERTEX_RADIUS, (Color){0, 0, 0, 60});
+        
+        // Draw outer ring
+        DrawCircle(pos.x, pos.y, VERTEX_RADIUS, VERTEX_BORDER_COLOR);
+        
+        // Draw main vertex with gradient for 3D effect
+        DrawCircleGradient(
+            pos.x, pos.y, 
+            VERTEX_INNER_RADIUS, 
+            vertexColor, 
+            ColorBrightness(vertexColor, 0.7f)
+        );
+        
+        // Draw vertex value with improved text positioning
+        std::string s = std::to_string(i);
+        int textWidth = MeasureText(s.c_str(), 22); // Slightly larger font
+        
+        // Draw text with shadow for better visibility
+        DrawText(s.c_str(), pos.x - textWidth/2 + 1, pos.y - 11 + 1, 22, (Color){0, 0, 0, 128});
+        DrawText(s.c_str(), pos.x - textWidth/2, pos.y - 11, 22, textColor);
+    }
+}
